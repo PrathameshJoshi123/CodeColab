@@ -132,4 +132,10 @@ public interface CodeCollabApiService {
     
     @GET("/users/{userId}/matches")
     Call<List<MatchRequestResponse>> getUserMatches(@Path("userId") String userId);
+    
+    @GET("/matches/user/my-requests")
+    Call<List<MatchRequestResponse>> getMyMatchRequests();
+    
+    @DELETE("/matches/{matchId}")
+    Call<Void> cancelMatchRequest(@Path("matchId") String matchId);
 }

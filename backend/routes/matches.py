@@ -78,15 +78,27 @@ async def browse_match_requests(
                     "user": user_doc.to_dict() if user_doc.exists else {}
                 }
                 
-                # Fetch user skills if available
-                skills_docs = db.collection("users").document(requester_id).collection("skills").stream()
+                # Fetch user skills from userSkills collection
                 user_skills = []
-                for skill_doc in skills_docs:
+                skills_query = db.collection("userSkills").where(
+                    filter=FieldFilter("userId", "==", requester_id)
+                ).stream()
+                
+                for skill_doc in skills_query:
                     skill_data = skill_doc.to_dict()
-                    user_skills.append({
-                        "id": skill_doc.id,
-                        **skill_data
-                    })
+                    skill_id = skill_data.get("skillId")
+                    
+                    # Fetch skill details from skills collection
+                    skill_ref = db.collection("skills").document(skill_id).get()
+                    if skill_ref.exists:
+                        skill_info = skill_ref.to_dict()
+                        user_skills.append({
+                            "id": skill_id,
+                            "name": skill_info.get("name"),
+                            "proficiency_level": skill_data.get("proficiency_level"),
+                            "years_of_experience": skill_data.get("years_of_experience")
+                        })
+                
                 match_with_user["user_skills"] = user_skills
                 
                 requests.append(match_with_user)

@@ -1,6 +1,8 @@
 package com.example.responsiveui;
 
 import android.os.Bundle;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -15,6 +17,8 @@ import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
 import com.example.responsiveui.api.models.MatchRequestCreateRequest;
 import com.example.responsiveui.api.models.MatchRequestResponse;
+import com.example.responsiveui.api.models.SkillCreateRequest;
+import com.example.responsiveui.api.models.SkillResponse;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -38,6 +42,7 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
 
     private Spinner spinnerSessionType;
     private EditText editMessage;
+    private EditText editSkillSearch;
     private ChipGroup chipGroupSkills;
     private Button btnCreate;
     private Button btnCancel;
@@ -48,6 +53,8 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
     
     private String[] sessionTypes = {"Debug", "Interview", "Hackathon", "Learning"};
     private List<String> selectedSkills = new ArrayList<>();
+    private List<SkillResponse> allSkills = new ArrayList<>();
+    private List<SkillResponse> filteredSkills = new ArrayList<>();
     
     // ==================== Interface for Callbacks ====================
     
@@ -86,6 +93,7 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         // Initialize UI components
         spinnerSessionType = view.findViewById(R.id.spinnerSessionType);
         editMessage = view.findViewById(R.id.editMessage);
+        editSkillSearch = view.findViewById(R.id.editSkillSearch);
         chipGroupSkills = view.findViewById(R.id.chipGroupSkills);
         btnCreate = view.findViewById(R.id.btnCreate);
         btnCancel = view.findViewById(R.id.btnCancel);
@@ -98,8 +106,11 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         
         // Setup UI elements
         setupSessionTypeSpinner();
-        setupSkillsChips();
+        setupSkillsSearch();
         setupButtonListeners();
+        
+        // Load all skills from API
+        loadSkillsFromAPI();
     }
 
     // ==================== Session Type Spinner Setup ====================
@@ -124,27 +135,134 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         });
     }
 
-    // ==================== Skills Chips Setup ====================
+    // ==================== Load Skills from API ====================
     
-    private void setupSkillsChips() {
-        String[] skills = {"Python", "Java", "JavaScript", "Kotlin", "Android", "React", 
-                          "Node.js", "Firebase", "SQL", "Git", "Docker", "AWS"};
+    private void loadSkillsFromAPI() {
+        Call<List<SkillResponse>> call = apiService.getAllSkills();
+        call.enqueue(new Callback<List<SkillResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<SkillResponse>> call, 
+                                 @NonNull Response<List<SkillResponse>> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    allSkills = response.body();
+                    filteredSkills = new ArrayList<>(allSkills);
+                    displaySkillChips(filteredSkills);
+                } else {
+                    Toast.makeText(getContext(), "Failed to load skills", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<SkillResponse>> call, @NonNull Throwable t) {
+                Toast.makeText(getContext(), "Error loading skills: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    // ==================== Skills Search Setup ====================
+    
+    private void setupSkillsSearch() {
+        editSkillSearch.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                filterAndDisplaySkills(s.toString());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
+
+    private void filterAndDisplaySkills(String query) {
+        filteredSkills.clear();
         
-        for (String skill : skills) {
+        if (query.isEmpty()) {
+            filteredSkills.addAll(allSkills);
+        } else {
+            for (SkillResponse skill : allSkills) {
+                if (skill.name.toLowerCase().contains(query.toLowerCase())) {
+                    filteredSkills.add(skill);
+                }
+            }
+        }
+        
+        displaySkillChips(filteredSkills);
+        
+        // If no results and query is not empty, show "Add New Skill" option
+        if (filteredSkills.isEmpty() && !query.isEmpty()) {
+            showAddNewSkillOption(query);
+        }
+    }
+
+    private void displaySkillChips(List<SkillResponse> skills) {
+        chipGroupSkills.removeAllViews();
+        
+        for (SkillResponse skill : skills) {
             Chip chip = new Chip(requireContext());
-            chip.setText(skill);
+            chip.setText(skill.name);
             chip.setCheckable(true);
+            chip.setChecked(selectedSkills.contains(skill.name));
+            
             chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
                 if (isChecked) {
-                    if (!selectedSkills.contains(skill)) {
-                        selectedSkills.add(skill);
+                    if (!selectedSkills.contains(skill.name)) {
+                        selectedSkills.add(skill.name);
                     }
                 } else {
-                    selectedSkills.remove(skill);
+                    selectedSkills.remove(skill.name);
                 }
             });
             chipGroupSkills.addView(chip);
         }
+    }
+
+    private void showAddNewSkillOption(String skillName) {
+        Chip chip = new Chip(requireContext());
+        chip.setText("+ Add '" + skillName + "'");
+        chip.setCheckable(false);
+        chip.setCloseIconVisible(false);
+        
+        chip.setOnClickListener(v -> createAndAddSkill(skillName));
+        chipGroupSkills.addView(chip);
+    }
+
+    // ==================== Create New Skill ====================
+    
+    private void createAndAddSkill(String skillName) {
+        if (apiService == null) return;
+        
+        SkillCreateRequest request = new SkillCreateRequest(skillName, "custom");
+        
+        Call<SkillResponse> call = apiService.createSkill(request);
+        call.enqueue(new Callback<SkillResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<SkillResponse> call, 
+                                 @NonNull Response<SkillResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    SkillResponse newSkill = response.body();
+                    
+                    // Add to our lists
+                    if (!allSkills.contains(newSkill)) {
+                        allSkills.add(newSkill);
+                    }
+                    selectedSkills.add(newSkill.name);
+                    
+                    // Clear search and reload
+                    editSkillSearch.setText("");
+                    Toast.makeText(getContext(), "Skill added! ✓", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(getContext(), "Failed to add skill", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<SkillResponse> call, @NonNull Throwable t) {
+                Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ==================== Button Listeners ====================
