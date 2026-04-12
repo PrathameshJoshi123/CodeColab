@@ -12,6 +12,10 @@ public class SkillCreateRequest {
     @SerializedName("category")
     public String category;
     
+    public SkillCreateRequest() {
+        // Default constructor for JSON deserialization
+    }
+    
     public SkillCreateRequest(String name, String category) {
         this.name = name;
         this.category = category;

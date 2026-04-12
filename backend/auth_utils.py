@@ -4,6 +4,8 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import jwt
 from config import settings
+from google.auth.transport import requests
+from google.oauth2 import id_token
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -45,4 +47,35 @@ def decode_access_token(token: str) -> dict | None:
     except jwt.ExpiredSignatureError:
         return None
     except jwt.InvalidTokenError:
+        return None
+
+
+# ==================== Google OAuth ====================
+
+def verify_google_token(id_token_str: str) -> dict | None:
+    """
+    Verify Google ID token from mobile client
+    
+    Returns decoded token data with user info if valid
+    Returns None if token is invalid or expired
+    """
+    try:
+        # Get the public certificates from Google
+        request_object = requests.Request()
+        
+        # Verify the token signature using Google's public keys
+        # Note: For production, specify the expected client ID for extra security
+        id_info = id_token.verify_oauth2_token(
+            id_token_str, 
+            request_object
+        )
+        
+        # Verify token hasn't expired (additional check)
+        if id_info.get("exp", 0) < datetime.utcnow().timestamp():
+            return None
+        
+        return id_info
+    
+    except Exception as e:
+        print(f"Google token verification failed: {str(e)}")
         return None

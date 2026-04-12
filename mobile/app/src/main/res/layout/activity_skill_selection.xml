@@ -29,6 +29,7 @@
                     android:src="@android:drawable/ic_menu_revert"
                     app:tint="@color/text_white" />
                 <TextView
+                    android:id="@+id/tvSkip"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentRight="true"
@@ -54,6 +55,7 @@
                 android:textSize="14sp" />
 
             <EditText
+                android:id="@+id/etSearchSkills"
                 android:layout_width="match_parent"
                 android:layout_height="50dp"
                 android:layout_marginTop="24dp"
@@ -67,169 +69,13 @@
                 android:textColorHint="@color/text_muted"
                 android:textSize="14sp" />
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="FRONTEND DEVELOPMENT"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="SUGGESTED FOR YOU"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
-
-            <com.google.android.material.chip.ChipGroup
+            <!-- Dynamic skills container populated by Activity -->
+            <LinearLayout
+                android:id="@+id/skillsContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp">
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="React"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/brand_blue"
-                    app:checkedIconVisible="true"
-                    android:checked="true"/>
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="TypeScript"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Tailwind CSS"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/brand_blue"
-                    android:checked="true"/>
-            </com.google.android.material.chip.ChipGroup>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="FRONTEND DEVELOPMENT"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
-
-            <com.google.android.material.chip.ChipGroup
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp">
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Vue.js"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Angular"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Next.js"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Svelte"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-            </com.google.android.material.chip.ChipGroup>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
-                android:text="BACKEND &amp; INFRASTRUCTURE"
-                android:textColor="@color/text_muted"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.1" />
-
-            <com.google.android.material.chip.ChipGroup
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp">
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Node.js"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/brand_blue"
-                    android:checked="true"/>
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Python"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Go"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Docker"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-
-                <com.google.android.material.chip.Chip
-                    style="@style/Widget.MaterialComponents.Chip.Filter"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="PostgreSQL"
-                    android:textColor="@color/text_white"
-                    app:chipBackgroundColor="@color/input_bg" />
-            </com.google.android.material.chip.ChipGroup>
+                android:orientation="vertical"
+                android:layout_marginTop="24dp" />
 
         </LinearLayout>
     </ScrollView>

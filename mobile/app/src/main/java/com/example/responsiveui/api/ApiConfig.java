@@ -1,8 +1,6 @@
 package com.example.responsiveui.api;
 
 import android.content.Context;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
@@ -14,11 +12,21 @@ import retrofit2.converter.gson.GsonConverterFactory;
  */
 public class ApiConfig {
     
-    // Backend URL - Update this to match your deployment
-    // For local development: http://10.0.2.2:8000 (Android emulator)
-    // For physical device: http://<YOUR_IP>:8000
-    // For production: https://your-domain.com
-    private static final String BASE_URL = "http://10.0.2.2:8000/";
+    // Backend URL - Configure based on your setup:
+    // 
+    // WiFi Debugging (Physical Device):
+    //   1. Find your machine IP: On Windows CMD run: ipconfig
+    //   2. Look for IPv4 Address (e.g., 192.168.x.x or 172.x.x.x)
+    //   3. Update below to: http://<YOUR_IP>:8000/
+    //   4. Example: http://192.168.1.100:8000/
+    //
+    // Android Emulator:
+    //   Use: http://10.0.2.2:8000/
+    //
+    // Production:
+    //   Use: https://your-domain.com
+    //
+    private static final String BASE_URL = "http://192.168.29.99:8000/"; // UPDATE TO YOUR MACHINE IP
     
     private static Retrofit retrofit;
     private static OkHttpClient okHttpClient;
@@ -50,7 +58,7 @@ public class ApiConfig {
         loggingInterceptor.setLevel(HttpLoggingInterceptor.Level.BODY);
         builder.addInterceptor(loggingInterceptor);
         
-        // Add Firebase JWT token interceptor
+        // Add JWT token interceptor for backend authentication
         builder.addInterceptor(new TokenInterceptor());
         
         return builder.build();

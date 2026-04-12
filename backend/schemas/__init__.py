@@ -29,6 +29,8 @@ from .auth import (
     LoginRequest,
     TokenResponse,
     SignUpResponse,
+    GoogleOAuthRequest,
+    GoogleOAuthResponse,
 )
 
 # Skills Domain

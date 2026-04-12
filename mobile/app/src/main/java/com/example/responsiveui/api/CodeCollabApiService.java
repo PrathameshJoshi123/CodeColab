@@ -20,6 +20,17 @@ public interface CodeCollabApiService {
     @GET("/health")
     Call<HealthResponse> getDetailedHealthStatus();
     
+    // ==================== Authentication ====================
+    
+    @POST("/auth/signup")
+    Call<AuthResponseModel> signUp(@Body SignUpRequestModel request);
+    
+    @POST("/auth/login")
+    Call<AuthResponseModel> login(@Body LoginRequestModel request);
+    
+    @POST("/auth/google")
+    Call<AuthResponseModel> googleOAuth(@Body GoogleOAuthRequestModel request);
+    
     // ==================== Users ====================
     
     @POST("/users/register")

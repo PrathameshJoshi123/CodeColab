@@ -173,10 +173,8 @@
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnGoogleSignIn"
-                        android:layout_width="0dp"
+                        android:layout_width="match_parent"
                         android:layout_height="56dp"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
                         android:backgroundTint="@color/text_white"
                         android:text="Google"
                         android:textAllCaps="false"
@@ -188,24 +186,6 @@
                         app:iconPadding="8dp"
                         app:icon="@drawable/ic_person"
                         android:contentDescription="Sign in with Google" />
-
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGithubSignIn"
-                        android:layout_width="0dp"
-                        android:layout_height="56dp"
-                        android:layout_weight="1"
-                        android:layout_marginStart="8dp"
-                        android:backgroundTint="@color/text_white"
-                        android:text="GitHub"
-                        android:textAllCaps="false"
-                        android:textColor="@color/bg_dark"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        app:cornerRadius="12dp"
-                        app:icon="@drawable/ic_github"
-                        app:iconGravity="textStart"
-                        app:iconPadding="8dp"
-                        android:contentDescription="Sign in with GitHub" />
                 </LinearLayout>
 
                 <TextView

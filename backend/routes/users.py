@@ -3,6 +3,7 @@ from firebase_init import get_db
 from middleware import get_current_user, security
 from schemas import UserCreate, UserLogin, UserLoginResponse, User, ProfileUpdate, Profile
 from datetime import datetime
+from google.cloud.firestore_v1 import FieldFilter
 import os
 import requests
 
@@ -216,6 +217,80 @@ async def update_profile(
         # Return updated profile
         profile_doc = db.collection("profiles").document(user_id).get()
         return Profile(**profile_doc.to_dict())
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+# ==================== User Skills ====================
+
+@router.put("/{user_id}/skills", response_model=list)
+async def update_user_skills(
+    user_id: str,
+    skills_data: dict = None,
+    credentials = Depends(security)
+):
+    """Update multiple skills for a user at once"""
+    try:
+        current_user_id = await get_current_user(credentials)
+        
+        # Users can only update their own skills
+        if current_user_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot update skills for another user"
+            )
+        
+        db = get_db()
+        
+        # First, remove all existing skills for this user
+        existing_skills = db.collection("userSkills").where(
+            filter=FieldFilter("userId", "==", user_id)
+        ).stream()
+        
+        for skill_doc in existing_skills:
+            skill_doc.reference.delete()
+        
+        # Add new skills
+        updated_skills = []
+        
+        if skills_data and "skills" in skills_data:
+            for skill_item in skills_data["skills"]:
+                skill_id = skill_item.get("skillId") if isinstance(skill_item, dict) else None
+                proficiency = skill_item.get("proficiency_level", "beginner") if isinstance(skill_item, dict) else "beginner"
+                
+                if not skill_id:
+                    continue
+                
+                # Verify skill exists
+                skill_doc = db.collection("skills").document(skill_id).get()
+                if not skill_doc.exists:
+                    continue
+                
+                skill_data = skill_doc.to_dict()
+                
+                # Create userSkill entry
+                user_skill_id = f"{user_id}_{skill_id}"
+                db.collection("userSkills").document(user_skill_id).set({
+                    "userId": user_id,
+                    "skillId": skill_id,
+                    "proficiency_level": proficiency,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                })
+                
+                updated_skills.append({
+                    "skillId": skill_id,
+                    "name": skill_data.get("name", ""),
+                    "category": skill_data.get("category", ""),
+                    "proficiency_level": proficiency
+                })
+        
+        return updated_skills
     
     except HTTPException:
         raise
