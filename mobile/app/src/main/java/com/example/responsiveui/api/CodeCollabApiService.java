@@ -132,5 +132,4 @@ public interface CodeCollabApiService {
     
     @GET("/users/{userId}/matches")
     Call<List<MatchRequestResponse>> getUserMatches(@Path("userId") String userId);
-    
 }

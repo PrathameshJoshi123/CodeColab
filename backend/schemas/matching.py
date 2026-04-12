@@ -19,6 +19,39 @@ class MatchRequest(BaseModel):
     status: str
     created_at: datetime
 
+# ==================== Match User Profile Models ====================
+
+class UserSkillInfo(BaseModel):
+    """User skill information in match context"""
+    id: str
+    name: str
+    proficiency_level: Optional[str] = "beginner"
+    years_of_experience: Optional[int] = None
+
+class UserMatchProfile(BaseModel):
+    """User profile information shown in match browse"""
+    uid: str
+    email: str
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    college: Optional[str] = None
+    city: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    is_available: Optional[bool] = True
+    reputation_score: Optional[float] = 0.0
+
+class MatchRequestWithUser(BaseModel):
+    """Match request with requester's user details and skills"""
+    id: str
+    userId: str
+    session_type: str
+    message: str
+    required_skills: Optional[List[str]] = None
+    status: str
+    created_at: datetime
+    user: Optional[UserMatchProfile] = None
+    user_skills: Optional[List[UserSkillInfo]] = None
+
 # ==================== Instant Help Models ====================
 
 class InstantHelpRequestCreate(BaseModel):

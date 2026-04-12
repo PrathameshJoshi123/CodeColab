@@ -16,7 +16,7 @@ public class MainContainerActivity extends AppCompatActivity {
 
         if (savedInstanceState == null) {
             getSupportFragmentManager().beginTransaction()
-                    .replace(R.id.fragment_container, new DashboardFragment())
+                    .replace(R.id.fragment_container, new MatchesFragment())
                     .commit();
         }
 
@@ -25,7 +25,7 @@ public class MainContainerActivity extends AppCompatActivity {
             int id = item.getItemId();
 
             if (id == R.id.nav_match) {
-                selectedFragment = new DashboardFragment();
+                selectedFragment = new MatchesFragment();
             } else if (id == R.id.nav_sprints) {
                 selectedFragment = new SprintsFragment();
             } else if (id == R.id.nav_chat) {

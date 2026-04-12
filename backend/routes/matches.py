@@ -44,12 +44,12 @@ async def create_match_request(
             detail=str(e)
         )
 
-@router.get("/browse", response_model=list[MatchRequest])
+@router.get("/browse", response_model=list[dict])
 async def browse_match_requests(
     session_type: str = None,
     credentials = Depends(security)
 ):
-    """Browse available match requests"""
+    """Browse available match requests with user details and skills"""
     try:
         user_id = await get_current_user(credentials)
         db = get_db()
@@ -69,7 +69,27 @@ async def browse_match_requests(
             request_data = doc.to_dict()
             # Exclude own requests
             if request_data.get("userId") != user_id:
-                requests.append(MatchRequest(**request_data))
+                # Fetch requester's profile details
+                requester_id = request_data.get("userId")
+                user_doc = db.collection("users").document(requester_id).get()
+                
+                match_with_user = {
+                    **request_data,
+                    "user": user_doc.to_dict() if user_doc.exists else {}
+                }
+                
+                # Fetch user skills if available
+                skills_docs = db.collection("users").document(requester_id).collection("skills").stream()
+                user_skills = []
+                for skill_doc in skills_docs:
+                    skill_data = skill_doc.to_dict()
+                    user_skills.append({
+                        "id": skill_doc.id,
+                        **skill_data
+                    })
+                match_with_user["user_skills"] = user_skills
+                
+                requests.append(match_with_user)
         
         return requests
     
@@ -127,11 +147,49 @@ async def accept_match_request(
         
         # Update request status
         db.collection("matchRequests").document(request_id).update({
-            "status": "accepted"
+            "status": "accepted",
+            "accepted_by": user_id,
+            "accepted_at": datetime.utcnow()
         })
         
         # Optional: Auto-create sprint session
         # This can be extended based on your requirements
+        
+        updated_doc = db.collection("matchRequests").document(request_id).get()
+        return MatchRequest(**updated_doc.to_dict())
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.put("/{request_id}/reject", response_model=MatchRequest)
+async def reject_match_request(
+    request_id: str,
+    credentials = Depends(security)
+):
+    """Reject a match request"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        # Get the match request
+        match_doc = db.collection("matchRequests").document(request_id).get()
+        if not match_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Match request not found"
+            )
+        
+        # Update request status
+        db.collection("matchRequests").document(request_id).update({
+            "status": "rejected",
+            "rejected_by": user_id,
+            "rejected_at": datetime.utcnow()
+        })
         
         updated_doc = db.collection("matchRequests").document(request_id).get()
         return MatchRequest(**updated_doc.to_dict())
