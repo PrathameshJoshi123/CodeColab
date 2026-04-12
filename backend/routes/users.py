@@ -174,6 +174,61 @@ async def get_user(user_id: str):
 
 # ==================== Profile Management ====================
 
+@router.get("/me/profile", response_model=Profile)
+async def get_current_user_profile(credentials = Depends(security)):
+    """Get current authenticated user's profile"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        profile_doc = db.collection("profiles").document(user_id).get()
+        
+        if not profile_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Profile not found"
+            )
+        
+        profile_dict = profile_doc.to_dict()
+        
+        # Ensure all required fields exist with defaults
+        if "userId" not in profile_dict:
+            profile_dict["userId"] = user_id
+        if "full_name" not in profile_dict:
+            profile_dict["full_name"] = ""
+        if "bio" not in profile_dict:
+            profile_dict["bio"] = ""
+        if "college" not in profile_dict:
+            profile_dict["college"] = ""
+        if "city" not in profile_dict:
+            profile_dict["city"] = ""
+        if "github_username" not in profile_dict:
+            profile_dict["github_username"] = ""
+        if "linkedin_url" not in profile_dict:
+            profile_dict["linkedin_url"] = ""
+        if "profile_image_url" not in profile_dict:
+            profile_dict["profile_image_url"] = ""
+        if "karma_score" not in profile_dict:
+            profile_dict["karma_score"] = 0
+        if "xp_points" not in profile_dict:
+            profile_dict["xp_points"] = 0
+        if "level" not in profile_dict:
+            profile_dict["level"] = 1
+        if "streak_count" not in profile_dict:
+            profile_dict["streak_count"] = 0
+        if "is_available" not in profile_dict:
+            profile_dict["is_available"] = True
+        
+        return Profile(**profile_dict)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @router.get("/{user_id}/profile", response_model=Profile)
 async def get_user_profile(user_id: str):
     """Get user profile (public)"""
@@ -187,8 +242,37 @@ async def get_user_profile(user_id: str):
                 detail="Profile not found"
             )
         
-        profile_data = profile_doc.to_dict()
-        return Profile(**profile_data)
+        profile_dict = profile_doc.to_dict()
+        
+        # Ensure all required fields exist with defaults
+        if "userId" not in profile_dict:
+            profile_dict["userId"] = user_id
+        if "full_name" not in profile_dict:
+            profile_dict["full_name"] = ""
+        if "bio" not in profile_dict:
+            profile_dict["bio"] = ""
+        if "college" not in profile_dict:
+            profile_dict["college"] = ""
+        if "city" not in profile_dict:
+            profile_dict["city"] = ""
+        if "github_username" not in profile_dict:
+            profile_dict["github_username"] = ""
+        if "linkedin_url" not in profile_dict:
+            profile_dict["linkedin_url"] = ""
+        if "profile_image_url" not in profile_dict:
+            profile_dict["profile_image_url"] = ""
+        if "karma_score" not in profile_dict:
+            profile_dict["karma_score"] = 0
+        if "xp_points" not in profile_dict:
+            profile_dict["xp_points"] = 0
+        if "level" not in profile_dict:
+            profile_dict["level"] = 1
+        if "streak_count" not in profile_dict:
+            profile_dict["streak_count"] = 0
+        if "is_available" not in profile_dict:
+            profile_dict["is_available"] = True
+        
+        return Profile(**profile_dict)
     
     except HTTPException:
         raise
@@ -210,13 +294,91 @@ async def update_profile(
         
         # Prepare update data (only non-None values)
         update_data = profile_data.model_dump(exclude_unset=True)
+        update_data["updated_at"] = datetime.utcnow()
         
         if update_data:
-            db.collection("profiles").document(user_id).update(update_data)
+            # Use set with merge=True to create if not exists, or update if exists
+            db.collection("profiles").document(user_id).set(update_data, merge=True)
         
-        # Return updated profile
+        # Return updated profile with default values for missing fields
         profile_doc = db.collection("profiles").document(user_id).get()
-        return Profile(**profile_doc.to_dict())
+        profile_dict = profile_doc.to_dict()
+        
+        # Ensure all required fields exist with defaults
+        if "userId" not in profile_dict:
+            profile_dict["userId"] = user_id
+        if "full_name" not in profile_dict:
+            profile_dict["full_name"] = ""
+        if "bio" not in profile_dict:
+            profile_dict["bio"] = ""
+        if "college" not in profile_dict:
+            profile_dict["college"] = ""
+        if "city" not in profile_dict:
+            profile_dict["city"] = ""
+        if "github_username" not in profile_dict:
+            profile_dict["github_username"] = ""
+        if "linkedin_url" not in profile_dict:
+            profile_dict["linkedin_url"] = ""
+        if "profile_image_url" not in profile_dict:
+            profile_dict["profile_image_url"] = ""
+        if "karma_score" not in profile_dict:
+            profile_dict["karma_score"] = 0
+        if "xp_points" not in profile_dict:
+            profile_dict["xp_points"] = 0
+        if "level" not in profile_dict:
+            profile_dict["level"] = 1
+        if "streak_count" not in profile_dict:
+            profile_dict["streak_count"] = 0
+        if "is_available" not in profile_dict:
+            profile_dict["is_available"] = True
+        
+        return Profile(**profile_dict)
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/me/profile/status", response_model=dict)
+async def get_profile_completion_status(credentials = Depends(security)):
+    """
+    Check if current user's profile is complete
+    Returns status indicating which fields are missing
+    """
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        profile_doc = db.collection("profiles").document(user_id).get()
+        
+        if not profile_doc.exists:
+            return {
+                "is_complete": False,
+                "message": "Profile not found",
+                "missing_fields": ["all"]
+            }
+        
+        profile_data = profile_doc.to_dict()
+        
+        # Define required fields for a complete profile
+        required_fields = ["full_name", "city", "college", "github_username"]
+        missing_fields = []
+        
+        for field in required_fields:
+            value = profile_data.get(field, "")
+            if not value or str(value).strip() == "":
+                missing_fields.append(field)
+        
+        is_complete = len(missing_fields) == 0
+        
+        return {
+            "is_complete": is_complete,
+            "missing_fields": missing_fields if missing_fields else [],
+            "message": "Profile complete" if is_complete else f"Missing {len(missing_fields)} fields"
+        }
     
     except HTTPException:
         raise

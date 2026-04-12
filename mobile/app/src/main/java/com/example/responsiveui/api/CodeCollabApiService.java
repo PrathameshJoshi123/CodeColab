@@ -51,6 +51,20 @@ public interface CodeCollabApiService {
     @GET("/users")
     Call<List<UserResponse>> getAllUsers();
     
+    // ==================== User Profile ====================
+    
+    @GET("/users/me/profile")
+    Call<UserProfileResponse> getCurrentUserProfile();
+    
+    @GET("/users/{userId}/profile")
+    Call<UserProfileResponse> getUserProfile(@Path("userId") String userId);
+    
+    @PUT("/users/me/profile")
+    Call<UserProfileResponse> updateCurrentUserProfile(@Body ProfileUpdateRequest request);
+    
+    @GET("/users/me/profile/status")
+    Call<ProfileStatusResponse> getProfileCompletionStatus();
+    
     // ==================== Skills ====================
     
     @GET("/skills")

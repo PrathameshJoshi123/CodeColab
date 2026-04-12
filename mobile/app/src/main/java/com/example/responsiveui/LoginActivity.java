@@ -2,6 +2,7 @@ package com.example.responsiveui;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
@@ -16,6 +17,7 @@ import com.example.responsiveui.api.TokenManager;
 import com.example.responsiveui.api.models.AuthResponseModel;
 import com.example.responsiveui.api.models.GoogleOAuthRequestModel;
 import com.example.responsiveui.api.models.LoginRequestModel;
+import com.example.responsiveui.api.models.ProfileStatusResponse;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
@@ -29,6 +31,7 @@ import retrofit2.Response;
 
 public class LoginActivity extends AppCompatActivity {
 
+    private static final String TAG = "LoginActivity";
     private EditText etEmail, etPassword;
     private Button btnLogin, btnGoogleSignIn;
     private TextView tvForgotPassword, tvSignUp;
@@ -43,10 +46,8 @@ public class LoginActivity extends AppCompatActivity {
         EdgeToEdge.enable(this);
         setContentView(R.layout.activity_login);
 
-        // Initialize TokenManager
+        // ==================== Initialize ====================
         TokenManager.init(this);
-
-        // Initialize API service
         apiService = ApiConfig.getApiService(this);
 
         // Configure Google Sign-In
@@ -67,6 +68,8 @@ public class LoginActivity extends AppCompatActivity {
         tvForgotPassword = findViewById(R.id.tvForgotPassword);
         tvSignUp = findViewById(R.id.tvSignUp);
 
+        // ==================== Setup Listeners ====================
+        
         // Email/Password login button
         btnLogin.setOnClickListener(v -> {
             String email = etEmail.getText().toString().trim();
@@ -98,6 +101,8 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    // ==================== Authentication Methods ====================
+    
     private void loginWithEmailPassword(String email, String password) {
         LoginRequestModel loginRequest = new LoginRequestModel(email, password);
         
@@ -115,20 +120,21 @@ public class LoginActivity extends AppCompatActivity {
                         authResponse.expiresIn
                     );
                     
+                    Log.d(TAG, "Login successful for: " + authResponse.email);
                     Toast.makeText(LoginActivity.this, "Welcome " + authResponse.email, Toast.LENGTH_SHORT).show();
                     
-                    // Navigate to next activity
-                    Intent intent = new Intent(LoginActivity.this, SkillSelectionActivity.class);
-                    startActivity(intent);
-                    finish();
+                    // Check profile completion status
+                    checkProfileCompletionAndNavigate();
                 } else {
                     Toast.makeText(LoginActivity.this, "Login failed: Invalid credentials", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Login failed with response code: " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<AuthResponseModel> call, Throwable t) {
                 Toast.makeText(LoginActivity.this, "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Login network error", t);
             }
         });
     }
@@ -151,6 +157,7 @@ public class LoginActivity extends AppCompatActivity {
                 }
             } catch (ApiException e) {
                 Toast.makeText(this, "Google sign-in failed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Google sign-in error", e);
             }
         }
     }
@@ -172,22 +179,75 @@ public class LoginActivity extends AppCompatActivity {
                         authResponse.expiresIn
                     );
                     
+                    Log.d(TAG, "Google login successful for: " + authResponse.email);
                     Toast.makeText(LoginActivity.this, "Welcome " + authResponse.email, Toast.LENGTH_SHORT).show();
                     
-                    // Navigate to next activity
-                    Intent intent = new Intent(LoginActivity.this, SkillSelectionActivity.class);
-                    startActivity(intent);
-                    finish();
+                    // Check profile completion status
+                    checkProfileCompletionAndNavigate();
                 } else {
                     Toast.makeText(LoginActivity.this, "Google authentication failed", Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Google auth failed with response code: " + response.code());
                 }
             }
 
             @Override
             public void onFailure(Call<AuthResponseModel> call, Throwable t) {
                 Toast.makeText(LoginActivity.this, "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Google auth network error", t);
             }
         });
+    }
+
+    // ==================== Profile Completion Check ====================
+    
+    /**
+     * Check if user's profile is complete
+     * Navigate to profile completion page only if profile is incomplete
+     */
+    private void checkProfileCompletionAndNavigate() {
+        apiService.getProfileCompletionStatus().enqueue(new Callback<ProfileStatusResponse>() {
+            @Override
+            public void onResponse(Call<ProfileStatusResponse> call, Response<ProfileStatusResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    ProfileStatusResponse status = response.body();
+                    
+                    if (status.isComplete) {
+                        // Profile is complete, go directly to main container
+                        Log.d(TAG, "Profile is complete, navigating to main container");
+                        navigateToMainContainer();
+                    } else {
+                        // Profile is incomplete, go to profile completion page
+                        Log.d(TAG, "Profile incomplete. Missing fields: " + status.missingFields);
+                        navigateToProfileCompletion();
+                    }
+                } else {
+                    // If we can't check status, assume incomplete and go to profile page
+                    Log.w(TAG, "Could not check profile status, defaulting to profile page");
+                    navigateToProfileCompletion();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<ProfileStatusResponse> call, Throwable t) {
+                // On network error, default to profile completion page
+                Log.w(TAG, "Failed to check profile status, defaulting to profile page", t);
+                navigateToProfileCompletion();
+            }
+        });
+    }
+    
+    private void navigateToProfileCompletion() {
+        Intent intent = new Intent(LoginActivity.this, SkillSelectionActivity.class);
+        intent.putExtra("USER_EMAIL", TokenManager.getUserEmail());
+        startActivity(intent);
+        finish();
+    }
+    
+    private void navigateToMainContainer() {
+        Intent intent = new Intent(LoginActivity.this, MainContainerActivity.class);
+        intent.putExtra("USER_EMAIL", TokenManager.getUserEmail());
+        startActivity(intent);
+        finish();
     }
 
     @Override
@@ -195,10 +255,9 @@ public class LoginActivity extends AppCompatActivity {
         super.onStart();
         // Check if user is already authenticated with valid token
         if (TokenManager.isUserAuthenticated()) {
-            // User is logged in, navigate to next activity
-            Intent intent = new Intent(LoginActivity.this, SkillSelectionActivity.class);
-            startActivity(intent);
-            finish();
+            // User is logged in, check profile status
+            Log.d(TAG, "User already authenticated, checking profile status");
+            checkProfileCompletionAndNavigate();
         }
     }
 }

@@ -21,6 +21,8 @@ import com.example.responsiveui.api.models.SkillResponse;
 import com.example.responsiveui.api.models.UserSkillUpdateRequest;
 import com.example.responsiveui.api.models.UserSkillResponse;
 import com.example.responsiveui.api.models.SkillCreateRequest;
+import com.example.responsiveui.api.models.ProfileUpdateRequest;
+import com.example.responsiveui.api.models.UserProfileResponse;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -34,21 +36,37 @@ import retrofit2.Callback;
 import retrofit2.Response;
 
 /**
- * Build your Tech Profile Activity
- * Allows users to select multiple skills for their profile
- * Skills are fetched from backend and grouped by category
- * Saves selected skills with proficiency levels to the backend
+ * Build your Tech Profile Activity (Two-Step Process)
+ * Step 1: Collect basic profile information (name, city, college, github, linkedin)
+ * Step 2: Select multiple skills with proficiency levels
+ * Saves all data to backend with JWT authentication
  */
 public class SkillSelectionActivity extends AppCompatActivity {
 
-    private static final String TAG = "SkillSelection";
+    private static final String TAG = "BuildTechProfile";
     private static final int MIN_SKILLS_REQUIRED = 3;
+    private static final int STEP_PROFILE = 1;
+    private static final int STEP_SKILLS = 2;
     
-    private Button btnContinue;
-    private String userEmail;
-    private String userId;
+    // UI Components - Profile Section
+    private EditText etFullName, etBio, etCity, etCollege, etGithubUsername, etLinkedinUrl;
+    private LinearLayout profileSection;
+    
+    // UI Components - Skills Section
     private EditText searchSkills;
     private LinearLayout skillsContainer;
+    private LinearLayout skillsSection;
+    
+    // UI Components - Selected Skills by Proficiency Level
+    private LinearLayout selectedSkillsSection;
+    private LinearLayout beginnerSection, intermediateSection, advancedSection;
+    private LinearLayout beginnerSkillsGroup, intermediateSkillsGroup, advancedSkillsGroup;
+    
+    private Button btnContinue;
+    
+    private String userEmail;
+    private String userId;
+    private int currentStep = STEP_PROFILE;
     
     private CodeCollabApiService apiService;
     private List<SkillResponse> allSkills = new ArrayList<>();
@@ -68,6 +86,7 @@ public class SkillSelectionActivity extends AppCompatActivity {
         
         initializeViews();
         setupListeners();
+        loadProfileData();
         loadSkillsFromBackend();
         loadUserExistingSkills();
     }
@@ -75,20 +94,47 @@ public class SkillSelectionActivity extends AppCompatActivity {
     // ==================== View Initialization ====================
     
     private void initializeViews() {
-        btnContinue = findViewById(R.id.btnContinue);
+        // Profile fields
+        etFullName = findViewById(R.id.etFullName);
+        etBio = findViewById(R.id.etBio);
+        etCity = findViewById(R.id.etCity);
+        etCollege = findViewById(R.id.etCollege);
+        etGithubUsername = findViewById(R.id.etGithubUsername);
+        etLinkedinUrl = findViewById(R.id.etLinkedinUrl);
+        profileSection = findViewById(R.id.profileSection);
+        
+        // Skills fields
         searchSkills = findViewById(R.id.etSearchSkills);
         skillsContainer = findViewById(R.id.skillsContainer);
+        skillsSection = findViewById(R.id.skillsSection);
+        
+        // Selected Skills by Proficiency Level
+        selectedSkillsSection = findViewById(R.id.selectedSkillsSection);
+        beginnerSection = findViewById(R.id.beginnerSection);
+        intermediateSection = findViewById(R.id.intermediateSection);
+        advancedSection = findViewById(R.id.advancedSection);
+        beginnerSkillsGroup = findViewById(R.id.beginnerSkillsGroup);
+        intermediateSkillsGroup = findViewById(R.id.intermediateSkillsGroup);
+        advancedSkillsGroup = findViewById(R.id.advancedSkillsGroup);
+        
+        btnContinue = findViewById(R.id.btnContinue);
     }
     
     private void setupListeners() {
         // Back button
-        findViewById(R.id.btnBack).setOnClickListener(v -> finish());
+        findViewById(R.id.btnBack).setOnClickListener(v -> {
+            if (currentStep == STEP_SKILLS) {
+                goBackToProfileStep();
+            } else {
+                finish();
+            }
+        });
         
         // Skip button
         findViewById(R.id.tvSkip).setOnClickListener(v -> goToMainContainer());
         
         // Continue button
-        btnContinue.setOnClickListener(v -> saveSkillsAndContinue());
+        btnContinue.setOnClickListener(v -> handleContinueClick());
         
         // Search functionality
         searchSkills.addTextChangedListener(new android.text.TextWatcher() {
@@ -105,7 +151,132 @@ public class SkillSelectionActivity extends AppCompatActivity {
         });
     }
 
-    // ==================== API Methods ====================
+    // ==================== Step Navigation ====================
+    
+    private void handleContinueClick() {
+        if (currentStep == STEP_PROFILE) {
+            validateAndSaveProfileData();
+        } else if (currentStep == STEP_SKILLS) {
+            validateAndSaveSkills();
+        }
+    }
+    
+    private void goBackToProfileStep() {
+        currentStep = STEP_PROFILE;
+        profileSection.setVisibility(LinearLayout.VISIBLE);
+        skillsSection.setVisibility(LinearLayout.GONE);
+        btnContinue.setText("Continue to Skills");
+    }
+    
+    private void goToSkillsStep() {
+        currentStep = STEP_SKILLS;
+        profileSection.setVisibility(LinearLayout.GONE);
+        skillsSection.setVisibility(LinearLayout.VISIBLE);
+        btnContinue.setText("Complete Profile");
+    }
+
+    // ==================== Profile Data Management ====================
+    
+    /**
+     * Load existing profile data from backend
+     */
+    private void loadProfileData() {
+        apiService.getCurrentUserProfile().enqueue(new Callback<UserProfileResponse>() {
+            @Override
+            public void onResponse(Call<UserProfileResponse> call, Response<UserProfileResponse> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    UserProfileResponse profile = response.body();
+                    populateProfileFields(profile);
+                    Log.d(TAG, "Loaded existing profile data");
+                } else {
+                    Log.d(TAG, "No existing profile found or permission denied");
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<UserProfileResponse> call, Throwable t) {
+                Log.d(TAG, "Failed to load profile: " + t.getMessage());
+            }
+        });
+    }
+    
+    /**
+     * Populate UI fields with existing profile data
+     */
+    private void populateProfileFields(UserProfileResponse profile) {
+        if (profile.fullName != null && !profile.fullName.isEmpty()) {
+            etFullName.setText(profile.fullName);
+        }
+        if (profile.bio != null && !profile.bio.isEmpty()) {
+            etBio.setText(profile.bio);
+        }
+        if (profile.city != null && !profile.city.isEmpty()) {
+            etCity.setText(profile.city);
+        }
+        if (profile.college != null && !profile.college.isEmpty()) {
+            etCollege.setText(profile.college);
+        }
+        if (profile.githubUsername != null && !profile.githubUsername.isEmpty()) {
+            etGithubUsername.setText(profile.githubUsername);
+        }
+        if (profile.linkedinUrl != null && !profile.linkedinUrl.isEmpty()) {
+            etLinkedinUrl.setText(profile.linkedinUrl);
+        }
+    }
+    
+    /**
+     * Validate profile data and save to backend
+     */
+    private void validateAndSaveProfileData() {
+        String fullName = etFullName.getText().toString().trim();
+        String city = etCity.getText().toString().trim();
+        String college = etCollege.getText().toString().trim();
+        
+        // Validate required fields
+        if (fullName.isEmpty() || city.isEmpty() || college.isEmpty()) {
+            Toast.makeText(this, "Please fill in Full Name, City, and College", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Save profile data
+        saveProfileToBackend();
+    }
+    
+    /**
+     * Save profile data to backend
+     */
+    private void saveProfileToBackend() {
+        ProfileUpdateRequest request = new ProfileUpdateRequest();
+        request.fullName = etFullName.getText().toString().trim();
+        request.bio = etBio.getText().toString().trim();
+        request.city = etCity.getText().toString().trim();
+        request.college = etCollege.getText().toString().trim();
+        request.githubUsername = etGithubUsername.getText().toString().trim();
+        request.linkedinUrl = etLinkedinUrl.getText().toString().trim();
+        request.isAvailable = true;
+        
+        apiService.updateCurrentUserProfile(request).enqueue(new Callback<UserProfileResponse>() {
+            @Override
+            public void onResponse(Call<UserProfileResponse> call, Response<UserProfileResponse> response) {
+                if (response.isSuccessful()) {
+                    Log.d(TAG, "Profile saved successfully");
+                    Toast.makeText(SkillSelectionActivity.this, "Profile saved!", Toast.LENGTH_SHORT).show();
+                    goToSkillsStep();
+                } else {
+                    Log.e(TAG, "Failed to save profile: " + response.code());
+                    Toast.makeText(SkillSelectionActivity.this, "Failed to save profile", Toast.LENGTH_SHORT).show();
+                }
+            }
+            
+            @Override
+            public void onFailure(Call<UserProfileResponse> call, Throwable t) {
+                Log.e(TAG, "Error saving profile", t);
+                Toast.makeText(SkillSelectionActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    // ==================== Skills Data Management ====================
     
     /**
      * Fetch all available skills from backend
@@ -146,7 +317,6 @@ public class SkillSelectionActivity extends AppCompatActivity {
                     for (UserSkillResponse skill : response.body()) {
                         selectedSkills.put(skill.skillId, skill.proficiencyLevel);
                     }
-                    // Update UI to show selected skills
                     updateSelectedSkillsUI();
                     Log.d(TAG, "Loaded existing " + selectedSkills.size() + " skills");
                 }
@@ -160,14 +330,21 @@ public class SkillSelectionActivity extends AppCompatActivity {
     }
     
     /**
-     * Save selected skills to backend
+     * Validate selected skills and save to backend
      */
-    private void saveSkillsToBackend() {
+    private void validateAndSaveSkills() {
         if (selectedSkills.size() < MIN_SKILLS_REQUIRED) {
             Toast.makeText(this, "Please select at least " + MIN_SKILLS_REQUIRED + " skills", Toast.LENGTH_SHORT).show();
             return;
         }
         
+        saveSkillsToBackend();
+    }
+    
+    /**
+     * Save selected skills to backend
+     */
+    private void saveSkillsToBackend() {
         // Convert selectedSkills map to API format
         List<UserSkillUpdateRequest.SkillUpdate> skillsList = new ArrayList<>();
         for (Map.Entry<String, String> entry : selectedSkills.entrySet()) {
@@ -182,7 +359,7 @@ public class SkillSelectionActivity extends AppCompatActivity {
             public void onResponse(Call<List<UserSkillResponse>> call, Response<List<UserSkillResponse>> response) {
                 if (response.isSuccessful()) {
                     Log.d(TAG, "Skills saved successfully");
-                    Toast.makeText(SkillSelectionActivity.this, "Skills saved!", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(SkillSelectionActivity.this, "Profile complete! Skills saved!", Toast.LENGTH_SHORT).show();
                     goToMainContainer();
                 } else {
                     Log.e(TAG, "Failed to save skills: " + response.code());
@@ -198,7 +375,7 @@ public class SkillSelectionActivity extends AppCompatActivity {
         });
     }
 
-    // ==================== UI Methods ====================
+    // ==================== Skills UI Methods ====================
     
     /**
      * Organize skills by category for better display
@@ -267,9 +444,8 @@ public class SkillSelectionActivity extends AppCompatActivity {
                 // Handle chip selection
                 chip.setOnCheckedChangeListener((buttonView, isChecked) -> {
                     if (isChecked) {
-                        // Show proficiency level dialog
                         showProficiencyDialog(skill.id, skill.name);
-                        chip.setChecked(true); // Keep checked
+                        chip.setChecked(true);
                     } else {
                         selectedSkills.remove(skill.id);
                     }
@@ -297,7 +473,6 @@ public class SkillSelectionActivity extends AppCompatActivity {
                 }
             }
             
-            // Show matching skills and "Add new skill" option if no matches
             if (filtered.isEmpty()) {
                 displayNoSkillsFoundUI(query);
             } else {
@@ -307,13 +482,11 @@ public class SkillSelectionActivity extends AppCompatActivity {
     }
     
     /**
-     * Show UI when no skills match the search query
-     * Provides option to create a new skill
+     * Show UI when no skills match the search query with option to create new
      */
     private void displayNoSkillsFoundUI(String searchQuery) {
         skillsContainer.removeAllViews();
         
-        // No results message
         TextView noResultsMsg = new TextView(this);
         noResultsMsg.setText("No skills found for \"" + searchQuery + "\"");
         noResultsMsg.setTextColor(getResources().getColor(R.color.text_muted));
@@ -326,7 +499,6 @@ public class SkillSelectionActivity extends AppCompatActivity {
         noResultsMsg.setLayoutParams(msgParams);
         skillsContainer.addView(noResultsMsg);
         
-        // Add new skill button
         Button btnAddSkill = new Button(this);
         btnAddSkill.setText("+ Add \"" + searchQuery + "\" as new skill");
         btnAddSkill.setTextColor(getResources().getColor(R.color.text_white));
@@ -353,7 +525,6 @@ public class SkillSelectionActivity extends AppCompatActivity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(16, 16, 16, 16);
         
-        // Skill name input
         EditText etSkillName = new EditText(this);
         etSkillName.setHint("Skill name");
         etSkillName.setText(skillNameSuggestion);
@@ -367,7 +538,6 @@ public class SkillSelectionActivity extends AppCompatActivity {
         etSkillName.setLayoutParams(nameParams);
         layout.addView(etSkillName);
         
-        // Category spinner/dropdown
         Spinner spinnerCategory = new Spinner(this);
         String[] categories = {"Frontend Development", "Backend & Infrastructure", "Mobile Development", 
                               "Data Science", "DevOps", "QA & Testing", "Design", "Other"};
@@ -416,15 +586,12 @@ public class SkillSelectionActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     SkillResponse newSkill = response.body();
                     
-                    // Add to allSkills list
                     allSkills.add(newSkill);
                     organizeSkillsByCategory();
                     
-                    // Auto-select the new skill with beginner proficiency
                     selectedSkills.put(newSkill.id, "beginner");
                     updateSelectedSkillsUI();
                     
-                    // Refresh display
                     displaySkills(allSkills);
                     clearSearchBar();
                     
@@ -480,20 +647,119 @@ public class SkillSelectionActivity extends AppCompatActivity {
     private void updateSelectedSkillsUI() {
         int selectedCount = selectedSkills.size();
         if (selectedCount > 0) {
-            btnContinue.setText("Continue (" + selectedCount + " selected)");
+            btnContinue.setText("Complete Profile (" + selectedCount + " selected)");
         } else {
-            btnContinue.setText("Continue");
+            btnContinue.setText("Complete Profile");
         }
+        
+        // Update proficiency level sections
+        updateProficiencyLevelSections();
+    }
+    
+    /**
+     * Update sections to show selected skills organized by proficiency level
+     */
+    private void updateProficiencyLevelSections() {
+        // Clear all sections
+        beginnerSkillsGroup.removeAllViews();
+        intermediateSkillsGroup.removeAllViews();
+        advancedSkillsGroup.removeAllViews();
+        
+        // Organize selected skills by proficiency level
+        Map<String, List<String>> skillsByProficiency = new HashMap<>();
+        skillsByProficiency.put("beginner", new ArrayList<>());
+        skillsByProficiency.put("intermediate", new ArrayList<>());
+        skillsByProficiency.put("advanced", new ArrayList<>());
+        skillsByProficiency.put("expert", new ArrayList<>());
+        
+        // Find skill names and organize
+        for (Map.Entry<String, String> entry : selectedSkills.entrySet()) {
+            String skillId = entry.getKey();
+            String proficiency = entry.getValue();
+            
+            // Find skill name from allSkills
+            String skillName = null;
+            for (SkillResponse skill : allSkills) {
+                if (skill.id.equals(skillId)) {
+                    skillName = skill.name;
+                    break;
+                }
+            }
+            
+            if (skillName != null) {
+                if (proficiency.equals("beginner")) {
+                    skillsByProficiency.get("beginner").add(skillName);
+                } else if (proficiency.equals("intermediate")) {
+                    skillsByProficiency.get("intermediate").add(skillName);
+                } else if (proficiency.equals("advanced") || proficiency.equals("expert")) {
+                    skillsByProficiency.get("advanced").add(skillName);
+                }
+            }
+        }
+        
+        // Add skills to their sections
+        if (!skillsByProficiency.get("beginner").isEmpty()) {
+            beginnerSection.setVisibility(LinearLayout.VISIBLE);
+            addSkillsToGroup(beginnerSkillsGroup, skillsByProficiency.get("beginner"));
+        } else {
+            beginnerSection.setVisibility(LinearLayout.GONE);
+        }
+        
+        if (!skillsByProficiency.get("intermediate").isEmpty()) {
+            intermediateSection.setVisibility(LinearLayout.VISIBLE);
+            addSkillsToGroup(intermediateSkillsGroup, skillsByProficiency.get("intermediate"));
+        } else {
+            intermediateSection.setVisibility(LinearLayout.GONE);
+        }
+        
+        if (!skillsByProficiency.get("advanced").isEmpty()) {
+            advancedSection.setVisibility(LinearLayout.VISIBLE);
+            addSkillsToGroup(advancedSkillsGroup, skillsByProficiency.get("advanced"));
+        } else {
+            advancedSection.setVisibility(LinearLayout.GONE);
+        }
+        
+        // Show/hide selected skills section
+        if (selectedSkills.isEmpty()) {
+            selectedSkillsSection.setVisibility(LinearLayout.GONE);
+        } else {
+            selectedSkillsSection.setVisibility(LinearLayout.VISIBLE);
+        }
+    }
+    
+    /**
+     * Add skill chips to a group layout
+     */
+    private void addSkillsToGroup(LinearLayout group, List<String> skills) {
+        ChipGroup chipGroup = new ChipGroup(this);
+        chipGroup.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        
+        for (String skillName : skills) {
+            Chip chip = new Chip(this);
+            chip.setText(skillName);
+            chip.setCheckable(false);
+            chip.setCloseIconVisible(true);
+            chip.setOnCloseIconClickListener(v -> {
+                // Find skill ID and remove it
+                for (SkillResponse skill : allSkills) {
+                    if (skill.name.equals(skillName)) {
+                        selectedSkills.remove(skill.id);
+                        updateSelectedSkillsUI();
+                        displaySkills(allSkills);
+                        break;
+                    }
+                }
+            });
+            chipGroup.addView(chip);
+        }
+        
+        group.addView(chipGroup);
     }
 
     // ==================== Navigation ====================
-    
-    /**
-     * Save skills and navigate to main container
-     */
-    private void saveSkillsAndContinue() {
-        saveSkillsToBackend();
-    }
     
     /**
      * Navigate to main container activity
