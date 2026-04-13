@@ -25,6 +25,9 @@ public class MatchRequestResponse {
     @SerializedName("status")
     public String status;
     
+    @SerializedName("scheduled_date_time")
+    public String scheduledDateTime;
+    
     @SerializedName("created_at")
     public String createdAt;
     

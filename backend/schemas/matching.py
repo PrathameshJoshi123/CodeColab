@@ -9,6 +9,7 @@ class MatchRequestCreate(BaseModel):
     session_type: str  # Debug, Interview, Hackathon, Learning
     message: str
     required_skills: Optional[List[str]] = None
+    scheduled_date_time: Optional[datetime] = None  # When the sprint is scheduled to happen
 
 class MatchRequest(BaseModel):
     """Match request response"""
@@ -17,6 +18,7 @@ class MatchRequest(BaseModel):
     session_type: str
     message: str
     status: str
+    scheduled_date_time: Optional[datetime] = None
     created_at: datetime
 
 # ==================== Match User Profile Models ====================

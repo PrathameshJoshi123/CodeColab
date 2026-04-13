@@ -191,6 +191,29 @@
             android:paddingHorizontal="12dp"
             android:paddingVertical="10dp" />
 
+        <!-- ==================== Scheduled Sprint Date/Time ==================== -->
+        <TextView
+            android:id="@+id/scheduledDateTimeText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🗓️ Scheduled: Apr 14, 2026 at 2:00 PM"
+            android:textColor="@color/brand_blue"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp"
+            android:visibility="gone" />
+
+        <!-- ==================== Created At Date ==================== -->
+        <TextView
+            android:id="@+id/createdAtText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Posted: Apr 13, 2026 at 10:30 AM"
+            android:textColor="@color/text_muted"
+            android:textSize="11sp"
+            android:layout_marginBottom="16dp"
+            android:visibility="gone" />
+
         <!-- ==================== Action Buttons ==================== -->
         <LinearLayout
             android:layout_width="match_parent"

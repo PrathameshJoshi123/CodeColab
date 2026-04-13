@@ -461,3 +461,218 @@ async def update_user_skills(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+
+# ==================== FCM Notifications ====================
+
+@router.post("/me/fcm-token")
+async def register_fcm_token(
+    token_data: dict,
+    credentials = Depends(security)
+):
+    """Register FCM token for current user to receive push notifications"""
+    try:
+        user_id = await get_current_user(credentials)
+        fcm_token = token_data.get("fcm_token")
+        
+        if not fcm_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="FCM token is required"
+            )
+        
+        db = get_db()
+        
+        # Update user document with FCM token
+        db.collection("users").document(user_id).update({
+            "fcm_token": fcm_token,
+            "fcm_updated_at": datetime.utcnow()
+        })
+        
+        print(f"\n{'='*60}")
+        print(f"✅ FCM Token registered for user: {user_id}")
+        print(f"   Token: {fcm_token[:30]}...")
+        print(f"{'='*60}\n")
+        
+        return {
+            "success": True,
+            "message": "FCM token registered successfully"
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+# ==================== Test Endpoints ====================
+
+@router.post("/test/send-notification")
+async def test_send_notification(
+    notification_data: dict,
+    credentials = Depends(security)
+):
+    """
+    TEST ENDPOINT: Send a test notification to verify FCM setup
+    
+    Usage:
+    POST /users/test/send-notification
+    {
+        "user_id": "target_user_id",
+        "title": "Test Title",
+        "body": "Test Message"
+    }
+    """
+    try:
+        from services.fcm_service import FCMService
+        
+        current_user = await get_current_user(credentials)
+        target_user_id = notification_data.get("user_id")
+        title = notification_data.get("title", "Test Notification")
+        body = notification_data.get("body", "This is a test notification")
+        
+        print(f"\n{'='*60}")
+        print(f"🧪 TEST NOTIFICATION REQUEST")
+        print(f"   From: {current_user}")
+        print(f"   To: {target_user_id}")
+        print(f"   Title: {title}")
+        print(f"   Body: {body}")
+        print(f"{'='*60}")
+        
+        db = get_db()
+        
+        # Verify target user exists and has FCM token
+        target_user_doc = db.collection("users").document(target_user_id).get()
+        if not target_user_doc.exists:
+            print(f"   ❌ User {target_user_id} not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User {target_user_id} not found"
+            )
+        
+        target_user_data = target_user_doc.to_dict()
+        fcm_token = target_user_data.get("fcm_token")
+        
+        if not fcm_token:
+            print(f"   ⚠️  User {target_user_id} has NO FCM token registered!")
+            print(f"   Available fields: {list(target_user_data.keys())}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"User {target_user_id} has no FCM token"
+            )
+        
+        print(f"   ✅ User found with token: {fcm_token[:30]}...")
+        
+        # Send test notification manually using FCMService
+        from firebase_admin import messaging
+        
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body
+            ),
+            data={
+                "type": "TEST",
+                "timestamp": datetime.utcnow().isoformat()
+            },
+            token=fcm_token
+        )
+        
+        print(f"   📤 Sending message via FCM...")
+        response = messaging.send(message)
+        
+        print(f"   ✅ Message sent successfully!")
+        print(f"   Message ID: {response}")
+        print(f"{'='*60}\n")
+        
+        return {
+            "success": True,
+            "message": "Test notification sent successfully",
+            "message_id": response,
+            "user_id": target_user_id,
+            "fcm_token": fcm_token[:30] + "..."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
+        print(f"{'='*60}\n")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.get("/test/fcm-token-status")
+async def check_fcm_tokens(credentials = Depends(security)):
+    """
+    TEST ENDPOINT: Check which users have FCM tokens registered
+    Useful for debugging why notifications aren't being sent
+    """
+    try:
+        current_user = await get_current_user(credentials)
+        db = get_db()
+        
+        print(f"\n{'='*60}")
+        print(f"🔍 FCM Token Status Check")
+        print(f"   Requested by: {current_user}")
+        print(f"{'='*60}")
+        
+        # Get all users and check their FCM tokens
+        users_with_tokens = []
+        users_without_tokens = []
+        total_users = 0
+        
+        for user_doc in db.collection("users").stream():
+            total_users += 1
+            user_data = user_doc.to_dict()
+            user_id = user_doc.id
+            
+            fcm_token = user_data.get("fcm_token")
+            email = user_data.get("email", "N/A")
+            full_name = user_data.get("full_name", "N/A")
+            
+            if fcm_token:
+                users_with_tokens.append({
+                    "user_id": user_id,
+                    "email": email,
+                    "full_name": full_name,
+                    "fcm_token": fcm_token[:40] + "..." if len(fcm_token) > 40 else fcm_token,
+                    "token_length": len(fcm_token),
+                    "fcm_updated_at": user_data.get("fcm_updated_at", "N/A")
+                })
+                print(f"   ✅ {user_id[:20]}... -> Token registered")
+            else:
+                users_without_tokens.append({
+                    "user_id": user_id,
+                    "email": email,
+                    "full_name": full_name
+                })
+                print(f"   ❌ {user_id[:20]}... -> NO TOKEN")
+        
+        print(f"\n📊 Summary:")
+        print(f"   Total Users: {total_users}")
+        print(f"   Users with FCM tokens: {len(users_with_tokens)}")
+        print(f"   Users WITHOUT FCM tokens: {len(users_without_tokens)}")
+        print(f"{'='*60}\n")
+        
+        return {
+            "summary": {
+                "total_users": total_users,
+                "users_with_tokens": len(users_with_tokens),
+                "users_without_tokens": len(users_without_tokens)
+            },
+            "users_with_tokens": users_with_tokens,
+            "users_without_tokens": users_without_tokens
+        }
+        
+    except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
+        print(f"{'='*60}\n")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )

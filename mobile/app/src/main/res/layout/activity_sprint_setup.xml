@@ -18,7 +18,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="24dp">
+            android:padding="24dp"
+            android:id="@+id/formContainer">
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -57,13 +58,16 @@
                 android:layout_marginTop="16dp">
 
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/btn30min"
                     android:layout_width="0dp"
                     android:layout_height="80dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="8dp"
                     app:cardBackgroundColor="@color/input_bg"
                     app:cardCornerRadius="16dp"
-                    app:cardElevation="0dp">
+                    app:cardElevation="0dp"
+                    android:clickable="true"
+                    android:focusable="true">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -77,13 +81,16 @@
                 </androidx.cardview.widget.CardView>
 
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/btn60min"
                     android:layout_width="0dp"
                     android:layout_height="80dp"
                     android:layout_weight="1"
                     android:layout_marginHorizontal="4dp"
                     app:cardBackgroundColor="@color/brand_blue"
                     app:cardCornerRadius="16dp"
-                    app:cardElevation="8dp">
+                    app:cardElevation="8dp"
+                    android:clickable="true"
+                    android:focusable="true">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -97,13 +104,16 @@
                 </androidx.cardview.widget.CardView>
 
                 <androidx.cardview.widget.CardView
+                    android:id="@+id/btn120min"
                     android:layout_width="0dp"
                     android:layout_height="80dp"
                     android:layout_weight="1"
                     android:layout_marginStart="8dp"
                     app:cardBackgroundColor="@color/input_bg"
                     app:cardCornerRadius="16dp"
-                    app:cardElevation="0dp">
+                    app:cardElevation="0dp"
+                    android:clickable="true"
+                    android:focusable="true">
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="match_parent"
@@ -158,6 +168,52 @@
                 android:padding="16dp"
                 android:textColor="@color/text_white"
                 android:textColorHint="@color/text_muted" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Repository Link (Optional)"
+                android:textColor="@color/text_white"
+                android:layout_marginTop="20dp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:id="@+id/etRepoLink"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/input_background"
+                android:drawableStart="@drawable/ic_flag"
+                android:drawablePadding="12dp"
+                android:drawableTint="@color/text_muted"
+                android:hint="e.g., https://github.com/user/repo"
+                android:paddingHorizontal="16dp"
+                android:textColor="@color/text_white"
+                android:textColorHint="@color/text_muted"
+                android:inputType="textUri" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Meeting Link (Optional)"
+                android:textColor="@color/text_white"
+                android:layout_marginTop="20dp"
+                android:textStyle="bold" />
+
+            <EditText
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:id="@+id/etMeetingLink"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/input_background"
+                android:drawableStart="@drawable/ic_flag"
+                android:drawablePadding="12dp"
+                android:drawableTint="@color/text_muted"
+                android:hint="e.g., https://meet.google.com/abc-defg-hij"
+                android:paddingHorizontal="16dp"
+                android:textColor="@color/text_white"
+                android:textColorHint="@color/text_muted"
+                android:inputType="textUri" />
 
             <RelativeLayout
                 android:layout_width="match_parent"
@@ -234,6 +290,17 @@
         android:textStyle="bold"
         android:backgroundTint="@color/brand_blue"
         app:cornerRadius="16dp"
+        app:layout_constraintBottom_toBottomOf="parent" />
+
+    <!-- Loading Progress Indicator -->
+    <ProgressBar
+        android:id="@+id/loadingProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

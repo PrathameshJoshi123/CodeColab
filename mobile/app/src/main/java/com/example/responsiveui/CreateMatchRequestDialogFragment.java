@@ -10,6 +10,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -22,11 +23,19 @@ import com.example.responsiveui.api.models.SkillResponse;
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.datepicker.MaterialDatePicker;
+import com.google.android.material.timepicker.MaterialTimePicker;
+import com.google.android.material.timepicker.TimeFormat;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * ==================== CreateMatchRequestDialogFragment ====================
@@ -47,6 +56,9 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
     private Button btnCreate;
     private Button btnCancel;
     private ImageButton btnCloseDialog;
+    private Button btnSelectDate;
+    private Button btnSelectTime;
+    private TextView textSelectedDateTime;
     
     private CodeCollabApiService apiService;
     private CreateMatchListener listener;
@@ -55,6 +67,9 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
     private List<String> selectedSkills = new ArrayList<>();
     private List<SkillResponse> allSkills = new ArrayList<>();
     private List<SkillResponse> filteredSkills = new ArrayList<>();
+    
+    // Date and time variables
+    private Calendar selectedDateTime = null;
     
     // ==================== Interface for Callbacks ====================
     
@@ -98,6 +113,9 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         btnCreate = view.findViewById(R.id.btnCreate);
         btnCancel = view.findViewById(R.id.btnCancel);
         btnCloseDialog = view.findViewById(R.id.btnCloseDialog);
+        btnSelectDate = view.findViewById(R.id.btnSelectDate);
+        btnSelectTime = view.findViewById(R.id.btnSelectTime);
+        textSelectedDateTime = view.findViewById(R.id.textSelectedDateTime);
         
         // Initialize API service
         if (getContext() != null) {
@@ -108,6 +126,7 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         setupSessionTypeSpinner();
         setupSkillsSearch();
         setupButtonListeners();
+        setupDateTimeListeners();
         
         // Load all skills from API
         loadSkillsFromAPI();
@@ -273,61 +292,128 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
         btnCloseDialog.setOnClickListener(v -> dismiss());
     }
 
-    // ==================== Create Request Handler ====================
+    // ==================== Date/Time Picker Setup ====================
+    
+    private void setupDateTimeListeners() {
+        btnSelectDate.setOnClickListener(v -> showDatePicker());
+        btnSelectTime.setOnClickListener(v -> showTimePicker());
+    }
+
+    private void showDatePicker() {
+        MaterialDatePicker<Long> datePicker = MaterialDatePicker.Builder.datePicker()
+                .setTitleText("Select Sprint Date")
+                .setSelection(System.currentTimeMillis())
+                .build();
+
+        datePicker.addOnPositiveButtonClickListener(selection -> {
+            if (selectedDateTime == null) {
+                selectedDateTime = Calendar.getInstance();
+            }
+            
+            Calendar selectedDate = Calendar.getInstance();
+            selectedDate.setTimeInMillis(selection);
+            
+            selectedDateTime.set(Calendar.YEAR, selectedDate.get(Calendar.YEAR));
+            selectedDateTime.set(Calendar.MONTH, selectedDate.get(Calendar.MONTH));
+            selectedDateTime.set(Calendar.DAY_OF_MONTH, selectedDate.get(Calendar.DAY_OF_MONTH));
+            
+            updateDateTimeDisplay();
+        });
+
+        datePicker.show(getChildFragmentManager(), "DATE_PICKER");
+    }
+
+    private void showTimePicker() {
+        MaterialTimePicker timePicker = new MaterialTimePicker.Builder()
+                .setTimeFormat(TimeFormat.CLOCK_12H)
+                .setHour(Calendar.getInstance().get(Calendar.HOUR_OF_DAY))
+                .setMinute(Calendar.getInstance().get(Calendar.MINUTE))
+                .setTitleText("Select Sprint Time")
+                .build();
+
+        timePicker.addOnPositiveButtonClickListener(v -> {
+            if (selectedDateTime == null) {
+                selectedDateTime = Calendar.getInstance();
+            }
+            
+            selectedDateTime.set(Calendar.HOUR_OF_DAY, timePicker.getHour());
+            selectedDateTime.set(Calendar.MINUTE, timePicker.getMinute());
+            
+            updateDateTimeDisplay();
+        });
+
+        timePicker.show(getChildFragmentManager(), "TIME_PICKER");
+    }
+
+    private void updateDateTimeDisplay() {
+        if (selectedDateTime != null) {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy 'at' hh:mm a", Locale.getDefault());
+            textSelectedDateTime.setText(sdf.format(selectedDateTime.getTime()));
+            textSelectedDateTime.setVisibility(View.VISIBLE);
+        }
+    }
+
+    // ==================== Create Match Request ====================
     
     private void handleCreateRequest() {
-        // Validate inputs
+        String sessionType = spinnerSessionType.getSelectedItem().toString();
         String message = editMessage.getText().toString().trim();
-        String sessionType = (String) spinnerSessionType.getSelectedItem();
         
         if (message.isEmpty()) {
-            Toast.makeText(getContext(), "Please enter a message", Toast.LENGTH_SHORT).show();
+            editMessage.setError("Message is required");
             return;
         }
         
-        if (sessionType == null || sessionType.isEmpty()) {
-            Toast.makeText(getContext(), "Please select a session type", Toast.LENGTH_SHORT).show();
+        if (selectedSkills.isEmpty()) {
+            Toast.makeText(getContext(), "Please select at least one skill", Toast.LENGTH_SHORT).show();
             return;
         }
         
-        // Create request
+        if (selectedDateTime == null) {
+            Toast.makeText(getContext(), "Please select a date and time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Format date for API (ISO 8601)
+        SimpleDateFormat apiFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US);
+        apiFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
+        String formattedDate = apiFormat.format(selectedDateTime.getTime());
+        
         MatchRequestCreateRequest request = new MatchRequestCreateRequest(
                 sessionType,
                 message,
-                selectedSkills.isEmpty() ? null : selectedSkills
+                selectedSkills,
+                formattedDate
         );
         
         btnCreate.setEnabled(false);
         btnCreate.setText("Creating...");
         
-        // Make API call
         Call<MatchRequestResponse> call = apiService.createMatchRequest(request);
         call.enqueue(new Callback<MatchRequestResponse>() {
             @Override
             public void onResponse(@NonNull Call<MatchRequestResponse> call, 
                                  @NonNull Response<MatchRequestResponse> response) {
+                btnCreate.setEnabled(true);
+                btnCreate.setText("Create Request");
+                
                 if (response.isSuccessful()) {
-                    Toast.makeText(getContext(), "Match request created! 🎉", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Match request created!", Toast.LENGTH_SHORT).show();
                     if (listener != null) {
                         listener.onMatchCreated();
                     }
                     dismiss();
                 } else {
-                    resetButton();
-                    Toast.makeText(getContext(), "Failed to create match request", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Failed: " + response.code(), Toast.LENGTH_SHORT).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<MatchRequestResponse> call, @NonNull Throwable t) {
-                resetButton();
+                btnCreate.setEnabled(true);
+                btnCreate.setText("Create Request");
                 Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
-    }
-
-    private void resetButton() {
-        btnCreate.setEnabled(true);
-        btnCreate.setText("Create");
     }
 }

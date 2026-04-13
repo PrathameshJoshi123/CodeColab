@@ -16,9 +16,20 @@ public class MatchRequestCreateRequest {
     @SerializedName("required_skills")
     public List<String> requiredSkills;
     
+    @SerializedName("scheduled_date_time")
+    public String scheduledDateTime;
+    
     public MatchRequestCreateRequest(String sessionType, String message, List<String> requiredSkills) {
         this.sessionType = sessionType;
         this.message = message;
         this.requiredSkills = requiredSkills;
+        this.scheduledDateTime = null;
+    }
+    
+    public MatchRequestCreateRequest(String sessionType, String message, List<String> requiredSkills, String scheduledDateTime) {
+        this.sessionType = sessionType;
+        this.message = message;
+        this.requiredSkills = requiredSkills;
+        this.scheduledDateTime = scheduledDateTime;
     }
 }

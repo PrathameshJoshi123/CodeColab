@@ -17,7 +17,8 @@ import java.util.List;
 /**
  * ==================== MatchAdapter ====================
  * RecyclerView adapter for displaying match cards
- * Shows user profiles with skills, reputation, and accept/reject actions
+ * Shows user profiles with skills, reputation, and created date
+ * Only displays accept action (for browsing other user's matches)
  */
 public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHolder> {
     
@@ -27,7 +28,6 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
 
     public interface MatchActionListener {
         void onAccept(MatchRequestResponse match);
-        void onReject(MatchRequestResponse match);
     }
 
     public MatchAdapter(List<MatchRequestResponse> matches, Context context) {
@@ -74,6 +74,8 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
         private TextView sessionTypeText;
         private TextView userBio;
         private TextView matchMessage;
+        private TextView scheduledDateTimeText;
+        private TextView createdAtText;
         private ChipGroup skillsChipGroup;
         private ChipGroup requiredSkillsChipGroup;
         private Button btnAccept;
@@ -89,6 +91,8 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
             sessionTypeText = itemView.findViewById(R.id.sessionTypeText);
             userBio = itemView.findViewById(R.id.userBio);
             matchMessage = itemView.findViewById(R.id.matchMessage);
+            scheduledDateTimeText = itemView.findViewById(R.id.scheduledDateTimeText);
+            createdAtText = itemView.findViewById(R.id.createdAtText);
             skillsChipGroup = itemView.findViewById(R.id.skillsChipGroup);
             requiredSkillsChipGroup = itemView.findViewById(R.id.requiredSkillsChipGroup);
             btnAccept = itemView.findViewById(R.id.btnAccept);
@@ -121,6 +125,25 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
             // Match Message
             matchMessage.setText(match.message);
 
+            // ==================== Scheduled Sprint Date/Time ====================
+            // This is the most important info - when the sprint is scheduled
+            if (match.scheduledDateTime != null && !match.scheduledDateTime.isEmpty()) {
+                String formattedScheduledTime = formatDateForDisplay(match.scheduledDateTime);
+                scheduledDateTimeText.setText("🗓️ Scheduled: " + formattedScheduledTime);
+                scheduledDateTimeText.setVisibility(View.VISIBLE);
+            } else {
+                scheduledDateTimeText.setVisibility(View.GONE);
+            }
+
+            // Created At Date/Time
+            if (match.createdAt != null) {
+                String formattedDate = formatDateForDisplay(match.createdAt);
+                createdAtText.setText("Posted: " + formattedDate);
+                createdAtText.setVisibility(View.VISIBLE);
+            } else {
+                createdAtText.setVisibility(View.GONE);
+            }
+
             // User Skills
             skillsChipGroup.removeAllViews();
             if (match.userSkills != null && !match.userSkills.isEmpty()) {
@@ -151,18 +174,60 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
                 requiredSkillsChipGroup.addView(noRequiredText);
             }
 
-            // Action Buttons
+            // ==================== Action Buttons ====================
+            // Only show Accept button (Hide Reject button in browse view)
+            btnAccept.setVisibility(View.VISIBLE);
+            btnReject.setVisibility(View.GONE);
+            
             btnAccept.setOnClickListener(v -> {
                 if (listener != null) {
                     listener.onAccept(match);
                 }
             });
+        }
 
-            btnReject.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onReject(match);
+        // ==================== Date Formatting ====================
+        
+        private String formatDateForDisplay(String isoDateTime) {
+            try {
+                // Parse ISO format: 2026-04-13T10:30:45.123456
+                String[] parts = isoDateTime.split("T");
+                if (parts.length >= 2) {
+                    String date = parts[0];  // 2026-04-13
+                    String time = parts[1].split("\\.")[0];  // 10:30:45
+                    
+                    // Convert to readable format: Apr 13, 2026 at 10:30 AM
+                    return formatToReadableDate(date, time);
                 }
-            });
+                return isoDateTime;
+            } catch (Exception e) {
+                return isoDateTime;
+            }
+        }
+
+        private String formatToReadableDate(String date, String time) {
+            try {
+                String[] dateParts = date.split("-");
+                int year = Integer.parseInt(dateParts[0]);
+                int month = Integer.parseInt(dateParts[1]);
+                int day = Integer.parseInt(dateParts[2]);
+                
+                String[] timeParts = time.split(":");
+                int hour = Integer.parseInt(timeParts[0]);
+                int minute = Integer.parseInt(timeParts[1]);
+                
+                String[] monthNames = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+                String monthStr = monthNames[month - 1];
+                
+                String amPm = hour >= 12 ? "PM" : "AM";
+                int displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+                
+                return String.format("%s %d, %d at %d:%02d %s", 
+                        monthStr, day, year, displayHour, minute, amPm);
+            } catch (Exception e) {
+                return "";
+            }
         }
     }
 }

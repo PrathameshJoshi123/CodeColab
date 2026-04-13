@@ -19,6 +19,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         settings.JWT_SECRET,
         algorithm=settings.JWT_ALGORITHM
     )
+    print(f"Generated JWT token: {encoded_jwt}")  # Debug log
     return encoded_jwt
 
 def decode_token(token: str) -> dict:

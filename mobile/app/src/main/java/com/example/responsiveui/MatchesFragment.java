@@ -34,8 +34,8 @@ import java.util.stream.Collectors;
  * Features:
  * - Create new match requests
  * - Browse matches by session type (All, Debug, Interview, Hackathon, Learning)
- * - Accept/Reject matches
- * - Display user profiles with skills and reputation
+ * - Accept matches (Reject only available in My Requests)
+ * - Display user profiles with skills, reputation, and created date
  * - Real-time filter switching
  */
 public class MatchesFragment extends Fragment implements MatchAdapter.MatchActionListener, 
@@ -399,31 +399,6 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
                     loadMatches(currentFilter);
                 } else {
                     Toast.makeText(getContext(), "Failed to accept match", Toast.LENGTH_SHORT).show();
-                }
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<MatchRequestResponse> call, @NonNull Throwable t) {
-                Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    @Override
-    public void onReject(MatchRequestResponse match) {
-        if (apiService == null || match == null) return;
-        
-        Call<MatchRequestResponse> call = apiService.rejectMatchRequest(match.id);
-        call.enqueue(new Callback<MatchRequestResponse>() {
-            @Override
-            public void onResponse(@NonNull Call<MatchRequestResponse> call, 
-                                 @NonNull Response<MatchRequestResponse> response) {
-                if (response.isSuccessful()) {
-                    Toast.makeText(getContext(), "Match rejected", Toast.LENGTH_SHORT).show();
-                    // Reload matches
-                    loadMatches(currentFilter);
-                } else {
-                    Toast.makeText(getContext(), "Failed to reject match", Toast.LENGTH_SHORT).show();
                 }
             }
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from firebase_init import get_db
 from middleware import get_current_user, security
 from schemas import MatchRequestCreate, MatchRequest
+from services.fcm_service import send_match_accepted_notification, send_match_rejected_notification
 from datetime import datetime
 import uuid
 from google.cloud.firestore_v1 import FieldFilter
@@ -29,6 +30,7 @@ async def create_match_request(
             "message": request_data.message,
             "required_skills": request_data.required_skills or [],
             "status": "pending",
+            "scheduled_date_time": request_data.scheduled_date_time,
             "created_at": datetime.utcnow()
         }
         
@@ -146,6 +148,11 @@ async def accept_match_request(
         user_id = await get_current_user(credentials)
         db = get_db()
         
+        print(f"\n{'='*60}")
+        print(f"📥 Match Accept Request: {request_id}")
+        print(f"   Accepter: {user_id}")
+        print(f"{'='*60}")
+        
         # Get the match request
         match_doc = db.collection("matchRequests").document(request_id).get()
         if not match_doc.exists:
@@ -157,12 +164,35 @@ async def accept_match_request(
         match_data = match_doc.to_dict()
         requester_id = match_data.get("userId")
         
+        print(f"   Requester: {requester_id}")
+        print(f"   Match Status (before): {match_data.get('status')}")
+        
         # Update request status
         db.collection("matchRequests").document(request_id).update({
             "status": "accepted",
             "accepted_by": user_id,
             "accepted_at": datetime.utcnow()
         })
+        
+        # Get accepter's name for notification
+        accepter_doc = db.collection("users").document(user_id).get()
+        accepter_name = "Someone"  # Default fallback
+        if accepter_doc.exists:
+            accepter_data = accepter_doc.to_dict()
+            accepter_name = accepter_data.get("full_name", accepter_data.get("email", "Someone"))
+        
+        print(f"   Accepter Name: {accepter_name}")
+        print(f"   Sending notification...")
+        
+        # Send FCM notification to requester
+        notification_result = send_match_accepted_notification(requester_id, accepter_name, request_id)
+        
+        if notification_result:
+            print(f"   ✅ Notification sent successfully!")
+        else:
+            print(f"   ❌ Notification failed to send!")
+        
+        print(f"{'='*60}\n")
         
         # Optional: Auto-create sprint session
         # This can be extended based on your requirements
@@ -173,6 +203,8 @@ async def accept_match_request(
     except HTTPException:
         raise
     except Exception as e:
+        print(f"   ❌ ERROR: {str(e)}")
+        print(f"{'='*60}\n")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
@@ -196,12 +228,25 @@ async def reject_match_request(
                 detail="Match request not found"
             )
         
+        match_data = match_doc.to_dict()
+        requester_id = match_data.get("userId")
+        
         # Update request status
         db.collection("matchRequests").document(request_id).update({
             "status": "rejected",
             "rejected_by": user_id,
             "rejected_at": datetime.utcnow()
         })
+        
+        # Get rejecter's name for notification
+        rejecter_doc = db.collection("users").document(user_id).get()
+        rejecter_name = "Someone"  # Default fallback
+        if rejecter_doc.exists:
+            rejecter_data = rejecter_doc.to_dict()
+            rejecter_name = rejecter_data.get("full_name", rejecter_data.get("email", "Someone"))
+        
+        # Send FCM notification to requester
+        send_match_rejected_notification(requester_id, rejecter_name, request_id)
         
         updated_doc = db.collection("matchRequests").document(request_id).get()
         return MatchRequest(**updated_doc.to_dict())

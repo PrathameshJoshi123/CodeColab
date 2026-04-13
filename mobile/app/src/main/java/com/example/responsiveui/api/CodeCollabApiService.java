@@ -65,6 +65,11 @@ public interface CodeCollabApiService {
     @GET("/users/me/profile/status")
     Call<ProfileStatusResponse> getProfileCompletionStatus();
     
+    // ==================== FCM Notifications ====================
+    
+    @POST("/users/me/fcm-token")
+    Call<Void> registerFcmToken(@Body java.util.Map<String, String> tokenData);
+    
     // ==================== Skills ====================
     
     @GET("/skills")
