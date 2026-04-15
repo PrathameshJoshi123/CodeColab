@@ -24,6 +24,24 @@ public class MatchRequestResponse {
     
     @SerializedName("status")
     public String status;
+
+    @SerializedName("accepted_by")
+    public String acceptedBy;
+
+    @SerializedName("accepted_at")
+    public String acceptedAt;
+
+    @SerializedName("linked_sprint_id")
+    public String linkedSprintId;
+
+    @SerializedName("sprint_status")
+    public String sprintStatus;
+
+    @SerializedName("is_exhausted")
+    public boolean isExhausted;
+
+    @SerializedName("can_setup_sprint")
+    public boolean canSetupSprint;
     
     @SerializedName("scheduled_date_time")
     public String scheduledDateTime;

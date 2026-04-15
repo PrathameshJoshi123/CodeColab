@@ -15,6 +15,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
+import com.example.responsiveui.api.TokenManager;
 import com.example.responsiveui.api.models.MatchRequestResponse;
 import com.example.responsiveui.api.models.SprintSessionCreateRequest;
 import com.example.responsiveui.api.models.SprintSessionResponse;
@@ -24,8 +25,8 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * ==================== Sprint Setup Activity ====================
@@ -45,6 +46,7 @@ public class SprintSetupActivity extends AppCompatActivity implements SprintTodo
     private String partnerName;
     private String partnerUID;
     private String userEmail;
+    private String currentUserId;
     private MatchRequestResponse matchData;
     private String sprintSessionId;  // Store sprint ID after creation
     
@@ -81,6 +83,12 @@ public class SprintSetupActivity extends AppCompatActivity implements SprintTodo
         partnerUID = intent.getStringExtra("PARTNER_UID");
         userEmail = intent.getStringExtra("USER_EMAIL");
 
+        TokenManager.init(this);
+        currentUserId = TokenManager.getUserId();
+        if (userEmail == null || userEmail.isEmpty()) {
+            userEmail = TokenManager.getUserEmail();
+        }
+
         // Initialize API service
         apiService = ApiConfig.getApiService(this);
 
@@ -95,6 +103,9 @@ public class SprintSetupActivity extends AppCompatActivity implements SprintTodo
         
         // Setup button listeners
         setupButtonListeners();
+
+        // Ensure partner UID/name are resolved from the linked match
+        fetchMatchDetailsIfNeeded();
     }
 
     // ==================== View Initialization ====================
@@ -255,20 +266,19 @@ public class SprintSetupActivity extends AppCompatActivity implements SprintTodo
         String repoLink = etRepoLink.getText().toString().trim();
         String meetingLink = etMeetingLink.getText().toString().trim();
         
-        // Prepare participants list (current user + partner UID)
+        // Prepare participants list (requester UID + accepted partner UID)
         participants.clear();
-        if (userEmail != null && !userEmail.isEmpty()) {
-            participants.add(userEmail);
+        if (currentUserId != null && !currentUserId.isEmpty()) {
+            participants.add(currentUserId);
         }
-        // Add partner's UID instead of name
         if (partnerUID != null && !partnerUID.isEmpty()) {
             participants.add(partnerUID);
         }
-        
-        // If empty, use defaults
-        if (participants.isEmpty()) {
-            participants.add("user1");
-            participants.add("user2");
+
+        if (participants.size() < 2) {
+            showLoading(false);
+            Toast.makeText(this, "Unable to resolve match participants", Toast.LENGTH_SHORT).show();
+            return;
         }
         
         // Create request with match ID
@@ -374,8 +384,43 @@ public class SprintSetupActivity extends AppCompatActivity implements SprintTodo
         summaryIntent.putExtra("PARTNER_UID", partnerUID);
         summaryIntent.putExtra("USER_EMAIL", userEmail);
         summaryIntent.putExtra("MATCH_ID", matchId);
+        summaryIntent.putExtra("SESSION_LENGTH", String.valueOf(selectedDuration));
         startActivity(summaryIntent);
         finish();
+    }
+
+    // ==================== Match Partner Resolution ====================
+
+    private void fetchMatchDetailsIfNeeded() {
+        if (matchId == null || matchId.isEmpty() || apiService == null) {
+            return;
+        }
+
+        Call<Map<String, Object>> call = apiService.getMatchDetails(matchId);
+        call.enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    return;
+                }
+
+                Map<String, Object> body = response.body();
+                Object partnerNameObj = body.get("partner_name");
+                Object partnerUidObj = body.get("partner_uid");
+
+                if (partnerNameObj instanceof String && !((String) partnerNameObj).isEmpty()) {
+                    partnerName = (String) partnerNameObj;
+                }
+                if (partnerUidObj instanceof String && !((String) partnerUidObj).isEmpty()) {
+                    partnerUID = (String) partnerUidObj;
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable t) {
+                // Keep fallback values from intent
+            }
+        });
     }
 
     // ==================== UI State ====================

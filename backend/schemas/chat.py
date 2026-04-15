@@ -1,19 +1,25 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 # ==================== Message Models ====================
 
 class MessageCreate(BaseModel):
     """Message creation"""
-    content: str
-    message_type: str = "text"  # text, code, link, file
+    content: Optional[str] = ""
+    message_type: str = "text"  # text, image, video, code, link, file
+    media_url: Optional[str] = None
+    media_name: Optional[str] = None
 
 class Message(BaseModel):
     """Message response"""
     id: str
     senderId: str
+    sender_name: Optional[str] = None
     content: str
     message_type: str
+    media_url: Optional[str] = None
+    media_name: Optional[str] = None
     created_at: datetime
     is_read: bool
 

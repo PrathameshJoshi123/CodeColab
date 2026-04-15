@@ -20,6 +20,7 @@ public class FCMMessageService extends FirebaseMessagingService {
     private static final String TAG = "FCMMessageService";
     private static final String CHANNEL_ID = "match_notifications";
     private static final int NOTIFICATION_ID = 1001;
+    private static final int CHAT_NOTIFICATION_BASE_ID = 3000;
 
     /**
      * Called when a message is received from Firebase Cloud Messaging
@@ -43,12 +44,59 @@ public class FCMMessageService extends FirebaseMessagingService {
             // Data message received (used for chat messages)
             String messageType = remoteMessage.getData().get("type");
             if ("CHAT_MESSAGE".equals(messageType)) {
-                // Handle chat message update - Firestore listener will handle the display
-                // Just refresh the chat if app is in foreground
                 Log.d(TAG, "Chat message received: " + remoteMessage.getData());
+                showChatMessageNotification(remoteMessage.getData());
             } else {
                 Log.d(TAG, "Data Payload: " + remoteMessage.getData());
             }
+        }
+    }
+
+    /**
+     * Display chat notification for data-only chat messages.
+     */
+    private void showChatMessageNotification(java.util.Map<String, String> data) {
+        String sprintId = data.get("sprint_id");
+        String senderName = data.get("sender_name");
+        String content = data.get("content");
+
+        if (senderName == null || senderName.trim().isEmpty()) {
+            senderName = "Partner";
+        }
+
+        if (content == null || content.trim().isEmpty()) {
+            content = "Sent a message";
+        }
+
+        createNotificationChannel();
+
+        Intent intent = new Intent(this, ChatDetailActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        intent.putExtra("SPRINT_ID", sprintId);
+        intent.putExtra("PARTNER_NAME", senderName);
+
+        int requestCode = sprintId != null ? sprintId.hashCode() : 0;
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+            this,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(senderName)
+            .setContentText(content)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_HIGH);
+
+        NotificationManager notificationManager =
+            (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+
+        if (notificationManager != null) {
+            int notificationId = CHAT_NOTIFICATION_BASE_ID + Math.abs(requestCode % 1000);
+            notificationManager.notify(notificationId, builder.build());
         }
     }
 
@@ -60,6 +108,7 @@ public class FCMMessageService extends FirebaseMessagingService {
         String notificationType = data.get("type");
         String matchId = data.get("match_id");
         String accepterName = data.get("accepter_name");
+        String requesterName = data.get("requester_name");
         String confirmerName = data.get("confirmer_name");
         String sprintId = data.get("sprint_id");
         
@@ -73,7 +122,13 @@ public class FCMMessageService extends FirebaseMessagingService {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         
         // Add extras based on notification type
-        if ("MATCH_ACCEPTED".equals(notificationType)) {
+        if ("MATCH_CREATED".equals(notificationType)) {
+            // User received a match created notification - open matches fragment with details
+            intent.putExtra("OPEN_MATCHES_TAB", true);
+            intent.putExtra("MATCH_ID", matchId);
+            intent.putExtra("SHOW_MATCH_DETAILS", true);
+            intent.putExtra("REQUESTER_NAME", requesterName != null ? requesterName : "Someone");
+        } else if ("MATCH_ACCEPTED".equals(notificationType)) {
             intent.putExtra("OPEN_SPRINT_SETUP", true);
             intent.putExtra("MATCH_ID", matchId);
             intent.putExtra("PARTNER_NAME", accepterName != null ? accepterName : "Partner");

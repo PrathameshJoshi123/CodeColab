@@ -25,6 +25,7 @@ public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.My
     public interface MyRequestActionListener {
         void onCancel(MatchRequestResponse request);
         void onSetupSprint(MatchRequestResponse request);
+        void onViewSprint(MatchRequestResponse request);
     }
 
     public MyRequestsAdapter(List<MatchRequestResponse> requests, Context context) {
@@ -91,7 +92,9 @@ public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.My
 
             // Status badge with drawable
             String status = request.status != null ? request.status : "pending";
-            statusBadge.setText(status.substring(0, 1).toUpperCase() + status.substring(1));
+            if (!status.isEmpty()) {
+                statusBadge.setText(status.substring(0, 1).toUpperCase() + status.substring(1));
+            }
             
             int statusDrawable;
             switch (status.toLowerCase()) {
@@ -115,16 +118,31 @@ public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.My
             // ==================== Button Actions ====================
             // Show different buttons based on status
             if ("accepted".equals(status.toLowerCase())) {
-                // Accepted request: show Setup Sprint button
-                btnCancel.setText("Setup Sprint");
-                btnCancel.setBackgroundResource(R.drawable.bg_button_solid_blue);
-                btnCancel.setVisibility(View.VISIBLE);
-                
-                btnCancel.setOnClickListener(v -> {
-                    if (listener != null) {
-                        listener.onSetupSprint(request);
-                    }
-                });
+                if (request.canSetupSprint) {
+                    // Accepted request with no sprint yet
+                    btnCancel.setText("Setup Sprint");
+                    btnCancel.setBackgroundResource(R.drawable.bg_button_solid_blue);
+                    btnCancel.setVisibility(View.VISIBLE);
+
+                    btnCancel.setOnClickListener(v -> {
+                        if (listener != null) {
+                            listener.onSetupSprint(request);
+                        }
+                    });
+                } else if (request.linkedSprintId != null && !request.linkedSprintId.isEmpty() && !request.isExhausted) {
+                    // Sprint already setup for this match
+                    btnCancel.setText("View Sprint");
+                    btnCancel.setBackgroundResource(R.drawable.bg_button_solid_blue);
+                    btnCancel.setVisibility(View.VISIBLE);
+
+                    btnCancel.setOnClickListener(v -> {
+                        if (listener != null) {
+                            listener.onViewSprint(request);
+                        }
+                    });
+                } else {
+                    btnCancel.setVisibility(View.GONE);
+                }
             } else if ("pending".equals(status.toLowerCase())) {
                 // Pending request: show Cancel button
                 btnCancel.setText("Cancel Request");

@@ -295,15 +295,18 @@ public class SprintsFragment extends Fragment {
     }
     
     private String getSprintCategory(SprintSessionResponse sprint) {
-        if (sprint.status == null) return "scheduled";
+        if (sprint.status == null) return "upcoming";
         
         switch (sprint.status.toLowerCase()) {
+            case "started":
             case "live":
-            case "confirmed":
                 return "live";
+            case "end":
             case "completed":
             case "finished":
                 return "attended";
+            case "setupped":
+            case "confirmed":
             case "scheduled":
             default:
                 return "upcoming";

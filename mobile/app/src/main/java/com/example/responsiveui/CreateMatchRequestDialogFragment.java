@@ -364,11 +364,6 @@ public class CreateMatchRequestDialogFragment extends BottomSheetDialogFragment 
             return;
         }
         
-        if (selectedSkills.isEmpty()) {
-            Toast.makeText(getContext(), "Please select at least one skill", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        
         if (selectedDateTime == null) {
             Toast.makeText(getContext(), "Please select a date and time", Toast.LENGTH_SHORT).show();
             return;

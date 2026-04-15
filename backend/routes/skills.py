@@ -124,7 +124,7 @@ async def get_user_skills(user_id: str):
             
             # Get skill details
             skill_doc = db.collection("skills").document(us_data["skillId"]).get()
-            skill_data = skill_doc.to_dict()
+            skill_data = skill_doc.to_dict() if skill_doc.exists else {}
             
             skill_list.append(UserSkillResponse(
                 skillId=us_data["skillId"],

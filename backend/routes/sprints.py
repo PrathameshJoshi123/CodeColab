@@ -11,24 +11,49 @@ router = APIRouter(prefix="/sprints", tags=["sprints"])
 
 # ==================== Helper Functions ====================
 
+def _name_from_email(email: str) -> str:
+    """Derive a readable fallback label from email local-part."""
+    if not email:
+        return ""
+    return email.split("@", 1)[0].strip()
+
 def _get_participant_details(db, participant_id: str) -> dict:
     """Fetch participant full name and email from users collection"""
+    email = ""
+    full_name = ""
+
     try:
         user_doc = db.collection("users").document(participant_id).get()
         if user_doc.exists:
-            user_data = user_doc.to_dict()
-            return {
-                "userId": participant_id,
-                "full_name": user_data.get("full_name", participant_id),
-                "email": user_data.get("email", "")
-            }
+            user_data = user_doc.to_dict() or {}
+            email = (user_data.get("email") or "").strip()
+            full_name = (user_data.get("full_name") or "").strip()
+
+            if not full_name:
+                full_name = (user_data.get("name") or "").strip()
     except Exception:
         pass
+
+    # Profile updates may store latest name only in profiles collection.
+    if not full_name:
+        try:
+            profile_doc = db.collection("profiles").document(participant_id).get()
+            if profile_doc.exists:
+                profile_data = profile_doc.to_dict() or {}
+                full_name = (profile_data.get("full_name") or "").strip()
+        except Exception:
+            pass
+
+    if not full_name and email:
+        full_name = _name_from_email(email)
+
+    if not full_name:
+        full_name = participant_id
     
     return {
         "userId": participant_id,
-        "full_name": participant_id,
-        "email": ""
+        "full_name": full_name,
+        "email": email
     }
 
 def _enrich_sprint_with_participant_details(db, sprint_data: dict) -> dict:
@@ -43,6 +68,181 @@ def _enrich_sprint_with_participant_details(db, sprint_data: dict) -> dict:
     sprint_data["participantDetails"] = participant_details
     return sprint_data
 
+def _sync_match_with_sprint_state(db, match_id: str, sprint_id: str, sprint_status: str):
+    """Keep linked match state aligned with sprint lifecycle"""
+    if not match_id:
+        return
+
+    match_ref = db.collection("matchRequests").document(match_id)
+    match_doc = match_ref.get()
+    if not match_doc.exists:
+        return
+
+    now = datetime.utcnow()
+    update_data = {
+        "linked_sprint_id": sprint_id,
+        "sprint_status": sprint_status,
+    }
+
+    if sprint_status == "end":
+        update_data.update({
+            "status": "exhausted",
+            "is_exhausted": True,
+            "exhausted_at": now,
+        })
+    elif sprint_status in ["setupped", "started"]:
+        update_data.update({
+            "status": "accepted",
+            "is_exhausted": False,
+        })
+
+    match_ref.update(update_data)
+
+
+# ==================== Progression Helpers ====================
+
+XP_PER_SPRINT_COMPLETION = 100
+XP_PER_LEVEL = 300
+PROFICIENCY_LEVELS = ["beginner", "intermediate", "advanced", "expert"]
+
+
+def _normalize_skill_name(skill_name: str) -> str:
+    return (skill_name or "").strip().lower()
+
+
+def _parse_profile_activity_date(value):
+    if not value:
+        return None
+
+    if isinstance(value, datetime):
+        return value.date()
+
+    try:
+        return datetime.fromisoformat(str(value)).date()
+    except ValueError:
+        return None
+
+
+def _next_proficiency_level(current_level: str) -> str:
+    normalized_level = (current_level or "beginner").strip().lower()
+    if normalized_level not in PROFICIENCY_LEVELS:
+        normalized_level = "beginner"
+
+    current_index = PROFICIENCY_LEVELS.index(normalized_level)
+    next_index = min(current_index + 1, len(PROFICIENCY_LEVELS) - 1)
+    return PROFICIENCY_LEVELS[next_index]
+
+
+def _update_user_progress_for_completion(db, user_id: str, completed_at: datetime):
+    profile_ref = db.collection("profiles").document(user_id)
+    profile_doc = profile_ref.get()
+    profile_data = profile_doc.to_dict() if profile_doc.exists else {}
+
+    current_xp_points = int(profile_data.get("xp_points", 0) or 0)
+    current_streak_count = int(profile_data.get("streak_count", 0) or 0)
+
+    new_xp_points = current_xp_points + XP_PER_SPRINT_COMPLETION
+    new_level = max(1, (new_xp_points // XP_PER_LEVEL) + 1)
+
+    completed_date = completed_at.date()
+    last_activity_date = _parse_profile_activity_date(profile_data.get("last_activity_date"))
+
+    if last_activity_date == completed_date:
+        new_streak_count = current_streak_count
+    elif last_activity_date and (completed_date - last_activity_date).days == 1:
+        new_streak_count = current_streak_count + 1
+    else:
+        new_streak_count = 1
+
+    profile_ref.set({
+        "userId": user_id,
+        "xp_points": new_xp_points,
+        "level": new_level,
+        "streak_count": new_streak_count,
+        "last_activity_date": completed_date.isoformat(),
+        "updated_at": completed_at,
+    }, merge=True)
+
+
+def _find_required_skill_ids(db, required_skill_names: list[str]) -> set[str]:
+    normalized_required_names = {
+        _normalize_skill_name(skill_name)
+        for skill_name in (required_skill_names or [])
+        if isinstance(skill_name, str) and skill_name.strip()
+    }
+
+    if not normalized_required_names:
+        return set()
+
+    required_skill_ids = set()
+    for skill_doc in db.collection("skills").stream():
+        skill_data = skill_doc.to_dict() or {}
+        skill_name = _normalize_skill_name(skill_data.get("name"))
+        if skill_name in normalized_required_names:
+            required_skill_ids.add(skill_doc.id)
+
+    return required_skill_ids
+
+
+def _upgrade_user_skills_for_completion(db, user_id: str, required_skill_ids: set[str], completed_at: datetime):
+    if not required_skill_ids:
+        return
+
+    user_skill_docs = db.collection("userSkills").where(
+        filter=FieldFilter("userId", "==", user_id)
+    ).stream()
+
+    for user_skill_doc in user_skill_docs:
+        user_skill_data = user_skill_doc.to_dict() or {}
+        skill_id = user_skill_data.get("skillId")
+
+        if skill_id not in required_skill_ids:
+            continue
+
+        current_level = (user_skill_data.get("proficiency_level") or "beginner").lower()
+        updated_level = _next_proficiency_level(current_level)
+
+        if updated_level != current_level:
+            user_skill_doc.reference.update({
+                "proficiency_level": updated_level,
+                "updated_at": completed_at,
+            })
+
+
+def _log_completion_activity(db, user_id: str, sprint_id: str, match_id: str, completed_at: datetime):
+    activity_id = str(uuid.uuid4())
+    db.collection("activityLogs").document(activity_id).set({
+        "id": activity_id,
+        "user_id": user_id,
+        "action_type": "completed_sprint",
+        "action_metadata": {
+            "sprint_id": sprint_id,
+            "match_id": match_id,
+            "xp_awarded": XP_PER_SPRINT_COMPLETION,
+        },
+        "created_at": completed_at,
+    })
+
+
+def _apply_sprint_completion_effects(db, sprint_id: str, session_data: dict, completed_at: datetime):
+    participants = [participant for participant in (session_data.get("participants") or []) if participant]
+    if not participants:
+        return
+
+    match_id = session_data.get("match_id")
+    match_data = {}
+    if match_id:
+        match_doc = db.collection("matchRequests").document(match_id).get()
+        if match_doc.exists:
+            match_data = match_doc.to_dict() or {}
+
+    required_skill_ids = _find_required_skill_ids(db, match_data.get("required_skills") or [])
+
+    for participant_id in participants:
+        _update_user_progress_for_completion(db, participant_id, completed_at)
+        _upgrade_user_skills_for_completion(db, participant_id, required_skill_ids, completed_at)
+        _log_completion_activity(db, participant_id, sprint_id, match_id, completed_at)
+
 
 # ==================== Sprint Session Management ====================
 
@@ -55,11 +255,60 @@ async def create_sprint_session(
     try:
         user_id = await get_current_user(credentials)
         db = get_db()
+
+        if not session_data.match_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Sprint setup requires a linked match"
+            )
+
+        match_ref = db.collection("matchRequests").document(session_data.match_id)
+        match_doc = match_ref.get()
+        if not match_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Linked match not found"
+            )
+
+        match_data = match_doc.to_dict()
+        requester_id = match_data.get("userId")
+        accepter_id = match_data.get("accepted_by")
+
+        if match_data.get("status") != "accepted":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sprint can be setup only for accepted matches"
+            )
+
+        if requester_id != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only the match requester can setup the sprint"
+            )
+
+        if not accepter_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Match has no accepted partner"
+            )
+
+        existing_sprints = list(
+            db.collection("sprintSessions")
+            .where(filter=FieldFilter("match_id", "==", session_data.match_id))
+            .stream()
+        )
+        if existing_sprints:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sprint already setup for this match"
+            )
         
         session_id = str(uuid.uuid4())
-        
-        # Add current user as participant if not already included
-        participants = list(set(session_data.participants + [user_id]))
+
+        # Sprint is always between requester and accepter for the linked match
+        participants = [requester_id, accepter_id]
+
+        now = datetime.utcnow()
         
         document_data = {
             "id": session_id,
@@ -69,14 +318,19 @@ async def create_sprint_session(
             "repo_link": session_data.repo_link or "",
             "meeting_link": session_data.meeting_link or "",
             "duration_minutes": session_data.duration_minutes,
-            "status": "scheduled",
-            "start_time": datetime.utcnow(),
+            "status": "setupped",
+            "start_time": now,
             "end_time": None,
             "participants": participants,
-            "match_id": session_data.match_id
+            "match_id": session_data.match_id,
+            "confirmed_by": None,
+            "confirmed_at": None,
+            "joined_participants": [],
+            "all_participants_joined": False
         }
         
         db.collection("sprintSessions").document(session_id).set(document_data)
+        _sync_match_with_sprint_state(db, session_data.match_id, session_id, "setupped")
         
         return SprintSession(**document_data)
     
@@ -89,9 +343,13 @@ async def create_sprint_session(
         )
 
 @router.get("/{session_id}", response_model=SprintSession)
-async def get_sprint_session(session_id: str):
+async def get_sprint_session(
+    session_id: str,
+    credentials = Depends(security)
+):
     """Get a sprint session by ID with participant details"""
     try:
+        user_id = await get_current_user(credentials)
         db = get_db()
         session_doc = db.collection("sprintSessions").document(session_id).get()
         
@@ -102,10 +360,41 @@ async def get_sprint_session(session_id: str):
             )
         
         session_data = session_doc.to_dict()
+
+        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not allowed to access this sprint"
+            )
+
         session_data = _enrich_sprint_with_participant_details(db, session_data)
         
         return SprintSession(**session_data)
     
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/", response_model=list[SprintSession])
+async def get_sprint_sessions(credentials = Depends(security)):
+    """Get all sprint sessions for current user"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+
+        sessions = []
+        for doc in db.collection("sprintSessions").stream():
+            session_data = doc.to_dict()
+            if user_id in session_data.get("participants", []) or session_data.get("createdBy") == user_id:
+                session_data = _enrich_sprint_with_participant_details(db, session_data)
+                sessions.append(SprintSession(**session_data))
+
+        return sessions
+
     except HTTPException:
         raise
     except Exception as e:
@@ -129,13 +418,15 @@ async def get_user_sprint_sessions(credentials = Depends(security)):
             filter=FieldFilter("createdBy", "==", user_id)
         ).stream()
         for doc in created:
-            sessions.append(SprintSession(**doc.to_dict()))
+            session_data = _enrich_sprint_with_participant_details(db, doc.to_dict())
+            sessions.append(SprintSession(**session_data))
         
         # Participated sessions (where user is in participants array)
         all_sessions = db.collection("sprintSessions").stream()
         for doc in all_sessions:
             session_data = doc.to_dict()
             if user_id in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+                session_data = _enrich_sprint_with_participant_details(db, session_data)
                 sessions.append(SprintSession(**session_data))
         
         return sessions
@@ -160,7 +451,8 @@ async def get_created_sprint_sessions(credentials = Depends(security)):
             filter=FieldFilter("createdBy", "==", user_id)
         ).stream()
         for doc in created:
-            sessions.append(SprintSession(**doc.to_dict()))
+            session_data = _enrich_sprint_with_participant_details(db, doc.to_dict())
+            sessions.append(SprintSession(**session_data))
         
         return sessions
     
@@ -185,6 +477,7 @@ async def get_invited_sprint_sessions(credentials = Depends(security)):
             session_data = doc.to_dict()
             # Include sprints where user is in participants but not the creator
             if user_id in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+                session_data = _enrich_sprint_with_participant_details(db, session_data)
                 sessions.append(SprintSession(**session_data))
         
         return sessions
@@ -215,23 +508,59 @@ async def update_sprint_session(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Sprint session not found"
             )
-        
+
         session_data = session_doc.to_dict()
         if session_data.get("createdBy") != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Only session creator can update"
             )
+
+        current_status = (session_data.get("status") or "setupped").lower()
+        if current_status == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ended sprint cannot be updated"
+            )
         
         # Prepare update
         update_data = {}
         if session_update.status:
-            update_data["status"] = session_update.status
-        if session_update.end_time:
+            requested_status = session_update.status.lower()
+
+            if requested_status not in ["setupped", "started", "end"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid sprint status transition"
+                )
+
+            if requested_status == "started":
+                if not session_data.get("confirmed_at"):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Sprint must be confirmed before start"
+                    )
+                update_data["status"] = "started"
+                update_data["start_time"] = datetime.utcnow()
+            elif requested_status == "end":
+                update_data["status"] = "end"
+                update_data["end_time"] = session_update.end_time or datetime.utcnow()
+            else:
+                update_data["status"] = "setupped"
+
+        if session_update.end_time and update_data.get("status") == "end":
             update_data["end_time"] = session_update.end_time
         
         if update_data:
             db.collection("sprintSessions").document(session_id).update(update_data)
+
+            if "status" in update_data:
+                _sync_match_with_sprint_state(
+                    db,
+                    session_data.get("match_id"),
+                    session_id,
+                    update_data["status"]
+                )
         
         # Return updated session
         updated_doc = db.collection("sprintSessions").document(session_id).get()
@@ -264,25 +593,136 @@ async def join_sprint_session(
         
         session_data = session_doc.to_dict()
         participants = session_data.get("participants", [])
-        
-        if user_id not in participants:
-            participants.append(user_id)
-            
-            # Update participants and track joined participants
-            joined_participants = session_data.get("joined_participants", [])
-            if user_id not in joined_participants:
-                joined_participants.append(user_id)
-            
-            db.collection("sprintSessions").document(session_id).update({
-                "participants": participants,
-                "joined_participants": joined_participants,
-                "all_participants_joined": len(joined_participants) >= len(session_data.get("participants", [])),
-                "started_at": datetime.utcnow() if len(joined_participants) >= len(session_data.get("participants", [])) else None
-            })
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sprint has ended and cannot be joined"
+            )
+
+        if user_id not in participants and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only linked match users can join this sprint"
+            )
+
+        joined_participants = session_data.get("joined_participants", [])
+        if user_id not in joined_participants:
+            joined_participants.append(user_id)
+
+        db.collection("sprintSessions").document(session_id).update({
+            "joined_participants": joined_participants,
+            "all_participants_joined": len(joined_participants) >= len(participants)
+        })
         
         updated_doc = db.collection("sprintSessions").document(session_id).get()
         return SprintSession(**updated_doc.to_dict())
     
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.post("/{session_id}/leave", response_model=SprintSession)
+async def leave_sprint_session(
+    session_id: str,
+    credentials = Depends(security)
+):
+    """Leave a sprint waiting room before sprint starts"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+
+        session_doc = db.collection("sprintSessions").document(session_id).get()
+        if not session_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        participants = session_data.get("participants", [])
+        if user_id not in participants and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only participants can leave this sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Sprint already ended"
+            )
+
+        joined_participants = [
+            participant
+            for participant in session_data.get("joined_participants", [])
+            if participant != user_id
+        ]
+
+        db.collection("sprintSessions").document(session_id).update({
+            "joined_participants": joined_participants,
+            "all_participants_joined": len(joined_participants) >= len(participants)
+        })
+
+        updated_doc = db.collection("sprintSessions").document(session_id).get()
+        return SprintSession(**updated_doc.to_dict())
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.post("/{session_id}/complete", response_model=SprintSession)
+async def complete_sprint_session(
+    session_id: str,
+    credentials = Depends(security)
+):
+    """End sprint and exhaust linked match"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+
+        session_ref = db.collection("sprintSessions").document(session_id)
+        session_doc = session_ref.get()
+        if not session_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        if session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only sprint creator can end the sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            return SprintSession(**session_data)
+
+        completed_at = datetime.utcnow()
+
+        session_ref.update({
+            "status": "end",
+            "end_time": completed_at
+        })
+        _sync_match_with_sprint_state(db, session_data.get("match_id"), session_id, "end")
+
+        try:
+            _apply_sprint_completion_effects(db, session_id, session_data, completed_at)
+        except Exception as progress_error:
+            print(f"⚠️ Failed to apply sprint completion effects: {progress_error}")
+
+        updated_doc = session_ref.get()
+        return SprintSession(**updated_doc.to_dict())
+
     except HTTPException:
         raise
     except Exception as e:
@@ -311,13 +751,23 @@ async def get_participants_status(
         session_data = session_doc.to_dict()
         participants = session_data.get("participants", [])
         joined_participants = session_data.get("joined_participants", [])
+
+        if user_id not in participants and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
+
+        session_status = (session_data.get("status") or "setupped").lower()
         
         return {
             "session_id": session_id,
+            "status": session_status,
+            "createdBy": session_data.get("createdBy"),
             "total_expected": len(participants),
             "joined_count": len(joined_participants),
             "all_joined": len(joined_participants) >= len(participants),
-            "started_at": session_data.get("started_at"),
+            "started_at": session_data.get("start_time"),
             "participants": participants,
             "joined_participants": joined_participants
         }
@@ -357,19 +807,26 @@ async def confirm_sprint_session(
         
         session_data = session_doc.to_dict()
         
-        # Check if user is creator or participant
-        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+        # Only creator can confirm sprint setup and notify partner
+        if session_data.get("createdBy") != user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only participants can confirm sprint"
+                detail="Only sprint creator can confirm sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Ended sprint cannot be confirmed"
             )
         
-        # Update sprint status to confirmed
+        # Confirmation notifies partner but keeps setup lifecycle state
         db.collection("sprintSessions").document(session_id).update({
-            "status": "confirmed",
+            "status": "setupped",
             "confirmed_by": user_id,
             "confirmed_at": datetime.utcnow()
         })
+        _sync_match_with_sprint_state(db, session_data.get("match_id"), session_id, "setupped")
         
         # Get partner details from match (same logic as /matches/{match_id}/details)
         partner_id = None
@@ -438,7 +895,7 @@ async def confirm_sprint_session(
         
         # Return updated session
         updated_doc = db.collection("sprintSessions").document(session_id).get()
-        return {"success": True, "message": "Sprint confirmed and notification sent to partner", "sprint": updated_doc.to_dict()}
+        return {"success": True, "message": "Sprint setup confirmed and notification sent to partner", "sprint": updated_doc.to_dict()}
     
     except HTTPException:
         raise
@@ -467,6 +924,19 @@ async def create_sprint_todo(
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot add todo to ended sprint"
             )
         
         todo_id = str(uuid.uuid4())
@@ -505,6 +975,20 @@ async def get_sprint_todos(
     try:
         user_id = await get_current_user(credentials)
         db = get_db()
+
+        session_doc = db.collection("sprintSessions").document(session_id).get()
+        if not session_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
         
         todos = []
         query = db.collection("sprintTodos").where(
@@ -545,6 +1029,32 @@ async def update_sprint_todo(
             )
         
         todo_data = todo_doc.to_dict()
+
+        session_doc = db.collection("sprintSessions").document(session_id).get()
+        if not session_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot edit todo in ended sprint"
+            )
+
+        if todo_data.get("sprint_id") != session_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Todo does not belong to this sprint"
+            )
         
         # Prepare update
         update_data = {"updated_at": datetime.utcnow()}
@@ -592,6 +1102,33 @@ async def delete_sprint_todo(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Todo not found"
             )
+
+        todo_data = todo_doc.to_dict()
+        if todo_data.get("sprint_id") != session_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Todo does not belong to this sprint"
+            )
+
+        session_doc = db.collection("sprintSessions").document(session_id).get()
+        if not session_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Sprint session not found"
+            )
+
+        session_data = session_doc.to_dict()
+        if user_id not in session_data.get("participants", []) and session_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete todo from ended sprint"
+            )
         
         db.collection("sprintTodos").document(todo_id).delete()
         
@@ -626,6 +1163,14 @@ async def get_sprint_details(
             )
         
         sprint_data = session_doc.to_dict()
+
+        if user_id not in sprint_data.get("participants", []) and sprint_data.get("createdBy") != user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this sprint"
+            )
+
+        sprint_data = _enrich_sprint_with_participant_details(db, sprint_data)
         
         # Get all todos
         todos = []
@@ -637,16 +1182,12 @@ async def get_sprint_details(
         
         # Get participant details
         participants_info = []
-        for participant_id in sprint_data.get("participants", []):
-            user_doc = db.collection("users").document(participant_id).get()
-            if user_doc.exists:
-                user_data = user_doc.to_dict()
-                participants_info.append({
-                    "uid": participant_id,
-                    "full_name": user_data.get("full_name"),
-                    "email": user_data.get("email"),
-                    "profile_image_url": user_data.get("profile_image_url")
-                })
+        for participant in sprint_data.get("participantDetails", []):
+            participants_info.append({
+                "uid": participant.get("userId"),
+                "full_name": participant.get("full_name"),
+                "email": participant.get("email"),
+            })
         
         return {
             **sprint_data,
@@ -690,6 +1231,12 @@ async def create_or_update_scratchpad(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not a participant in this sprint"
+            )
+
+        if (session_data.get("status") or "").lower() == "end":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot update scratchpad for ended sprint"
             )
         
         # Check if scratchpad exists for this sprint

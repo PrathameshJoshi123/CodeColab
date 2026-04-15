@@ -132,6 +132,106 @@ class FCMService:
             return False
 
     @staticmethod
+    def send_match_created_notification(match_id: str, match_data: dict, requester_name: str):
+        """
+        Send notifications to all users with required skills when a match is created
+        
+        Args:
+            match_id: ID of the created match request
+            match_data: Dictionary containing match details (required_skills, session_type, message)
+            requester_name: Full name of user who created the match request
+        """
+        try:
+            db = get_db()
+            required_skills = match_data.get("required_skills", [])
+            session_type = match_data.get("session_type", "")
+            message = match_data.get("message", "")
+            requester_id = match_data.get("userId", "")
+            
+            if not required_skills:
+                logger.info(f"No required skills specified for match {match_id}")
+                return True
+            
+            # Collect all unique user IDs with required skills
+            users_to_notify = set()
+            
+            for skill_id in required_skills:
+                # Query userSkills collection for users with this skill
+                user_skills_query = db.collection("userSkills").where(
+                    filter=FieldFilter("skillId", "==", skill_id)
+                ).stream()
+                
+                for user_skill_doc in user_skills_query:
+                    user_skill_data = user_skill_doc.to_dict()
+                    user_id = user_skill_data.get("userId")
+                    
+                    # Don't notify the requester
+                    if user_id and user_id != requester_id:
+                        users_to_notify.add(user_id)
+            
+            logger.info(f"Found {len(users_to_notify)} users with required skills for match {match_id}")
+            
+            # Send notifications to all matched users
+            notification_count = 0
+            for user_id in users_to_notify:
+                try:
+                    # Get user's FCM token
+                    user_doc = db.collection("users").document(user_id).get()
+                    
+                    if not user_doc.exists:
+                        logger.warning(f"User {user_id} not found in database")
+                        continue
+                    
+                    user_data = user_doc.to_dict()
+                    fcm_token = user_data.get("fcm_token")
+                    
+                    if not fcm_token:
+                        logger.debug(f"FCM token not found for user {user_id}")
+                        continue
+                    
+                    # Prepare notification message
+                    notification_body = f"{requester_name} created a {session_type} collaboration request"
+                    
+                    message_obj = messaging.Message(
+                        notification=messaging.Notification(
+                            title=f"New {session_type} Collaboration Request 🤝",
+                            body=notification_body
+                        ),
+                        data={
+                            "match_id": match_id,
+                            "type": "MATCH_CREATED",
+                            "requester_name": requester_name,
+                            "session_type": session_type,
+                            "message_preview": message[:100]  # Send preview of message
+                        },
+                        token=fcm_token
+                    )
+                    
+                    # Send the message
+                    response = messaging.send(message_obj)
+                    logger.info(f"✓ Match created notification sent to user {user_id}. Message ID: {response}")
+                    notification_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"✗ Failed to send notification to user {user_id}: {str(e)}")
+                    continue
+            
+            # Log notification in Firestore
+            FCMService._log_notification(
+                requester_id,
+                "MATCH_CREATED",
+                f"Match created with {len(users_to_notify)} potential matches",
+                match_id
+            )
+            
+            logger.info(f"✓ Successfully sent {notification_count} match created notifications for match {match_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"✗ Failed to send match created notifications: {str(e)}", exc_info=True)
+            return False
+
+    @staticmethod
     def _log_notification(user_id: str, notification_type: str, title: str, reference_id: str):
         """
         Log notification in Firestore for history/tracking
@@ -162,6 +262,11 @@ class FCMService:
 
 
 # ==================== Convenience Functions ====================
+
+def send_match_created_notification(match_id: str, match_data: dict, requester_name: str):
+    """Convenience function to send match created notifications to users with required skills"""
+    return FCMService.send_match_created_notification(match_id, match_data, requester_name)
+
 
 def send_match_accepted_notification(requester_id: str, accepter_name: str, match_id: str):
     """Convenience function to send match acceptance notification"""

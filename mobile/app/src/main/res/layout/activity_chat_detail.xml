@@ -56,6 +56,7 @@
         </LinearLayout>
 
         <ImageView
+            android:id="@+id/btnHeaderCamera"
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_centerVertical="true"
@@ -90,59 +91,14 @@
             android:padding="16dp">
 
             <TextView
+                android:id="@+id/tvEmptyMessages"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
-                android:layout_marginBottom="24dp"
-                android:text="Today 9:41 AM"
+                android:layout_marginTop="20dp"
+                android:text="No messages yet"
                 android:textColor="@color/text_muted"
-                android:textSize="12sp" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="60dp"
-                android:background="@drawable/input_background"
-                android:padding="12dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Hey! Did you check the pull request I sent for the authentication module?"
-                    android:textColor="@color/text_white" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:text="09:42 AM"
-                android:textColor="@color/text_muted"
-                android:textSize="10sp" />
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginStart="60dp"
-                android:layout_marginTop="16dp"
-                android:backgroundTint="@color/brand_blue"
-                android:background="@drawable/input_background"
-                android:padding="12dp">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Just looking at it now. The logic in the middleware looks solid."
-                    android:textColor="@color/text_white" />
-            </LinearLayout>
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:layout_marginTop="4dp"
-                android:text="09:45 AM"
-                android:textColor="@color/text_muted"
-                android:textSize="10sp" />
+                android:textSize="13sp" />
 
         </LinearLayout>
     </ScrollView>
@@ -158,6 +114,7 @@
         app:layout_constraintBottom_toBottomOf="parent">
 
         <ImageView
+            android:id="@+id/btnAttachMedia"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:background="@drawable/input_background"

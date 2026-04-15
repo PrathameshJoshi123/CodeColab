@@ -11,6 +11,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.HorizontalScrollView;
 import androidx.annotation.NonNull;
@@ -22,11 +23,13 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
 import com.example.responsiveui.api.models.MatchRequestResponse;
+import com.example.responsiveui.api.models.SprintSessionResponse;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import com.google.firebase.auth.FirebaseAuth;
 
@@ -51,10 +54,13 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private RecyclerView receivedMatchesRecyclerView;
     private ProgressBar loadingProgress;
     private LinearLayout emptyState;
+    private TextView emptyStateTitle;
+    private TextView emptyStateSubtitle;
+    private View searchCardView;
     private Button btnCreateMatch;
     private Button tabBrowse;
     private Button tabMyRequests;
-    private Button tabReceiver;
+    private Button tabAccepted;
     private EditText searchSkillsInput;
     private MatchAdapter matchAdapter;
     private MyRequestsAdapter myRequestsAdapter;
@@ -68,7 +74,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private CardView filterLearning;
     
     private String currentFilter = null;  // null = All
-    private String currentTab = "browse";  // "browse", "requests", or "receiver"
+    private String currentTab = "browse";  // "browse", "requests", or "accepted"
     private HorizontalScrollView filterScroll;  // Filter buttons container
     private List<MatchRequestResponse> allMatches = new ArrayList<>();  // Cache all matches for search
 
@@ -89,12 +95,15 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         receivedMatchesRecyclerView = view.findViewById(R.id.receivedMatchesRecyclerView);
         loadingProgress = view.findViewById(R.id.loadingProgress);
         emptyState = view.findViewById(R.id.emptyState);
+        emptyStateTitle = view.findViewById(R.id.emptyStateTitle);
+        emptyStateSubtitle = view.findViewById(R.id.emptyStateSubtitle);
+        searchCardView = view.findViewById(R.id.searchCardView);
         btnCreateMatch = view.findViewById(R.id.btnCreateMatch);
         searchSkillsInput = view.findViewById(R.id.searchSkillsInput);
         
         tabBrowse = view.findViewById(R.id.tabBrowse);
         tabMyRequests = view.findViewById(R.id.tabMyRequests);
-        tabReceiver = view.findViewById(R.id.tabReceiver);
+        tabAccepted = view.findViewById(R.id.tabReceiver);
         
         filterAll = view.findViewById(R.id.filterAll);
         filterDebug = view.findViewById(R.id.filterDebug);
@@ -124,9 +133,30 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         
         // Setup create button
         setupCreateButton();
+
+        updateEmptyStateCopy();
+        
+        // Check if coming from notification intent
+        handleNotificationIntent();
         
         // Load browse matches initially
         loadMatches(null);
+    }
+
+    // ==================== Handle Notification Intent ====================
+    
+    private void handleNotificationIntent() {
+        Bundle args = getArguments();
+        if (args != null && args.getBoolean("SHOW_MATCH_DETAILS", false)) {
+            String matchId = args.getString("MATCH_ID");
+            if (matchId != null) {
+                // Show the match details in browse tab
+                switchTab("browse");
+                // Optionally: scroll to match, highlight it, or show details dialog
+                args.remove("SHOW_MATCH_DETAILS");
+                args.remove("MATCH_ID");
+            }
+        }
     }
 
     // ==================== RecyclerView Setup ====================
@@ -218,7 +248,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private void setupTabButtons() {
         tabBrowse.setOnClickListener(v -> switchTab("browse"));
         tabMyRequests.setOnClickListener(v -> switchTab("requests"));
-        tabReceiver.setOnClickListener(v -> switchTab("receiver"));
+        tabAccepted.setOnClickListener(v -> switchTab("accepted"));
     }
 
     private void switchTab(String tab) {
@@ -235,13 +265,15 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         tabBrowse.setTextColor(getResources().getColor(R.color.text_muted, null));
         tabMyRequests.setBackgroundResource(R.drawable.bg_button_outline);
         tabMyRequests.setTextColor(getResources().getColor(R.color.text_muted, null));
-        tabReceiver.setBackgroundResource(R.drawable.bg_button_outline);
-        tabReceiver.setTextColor(getResources().getColor(R.color.text_muted, null));
+        tabAccepted.setBackgroundResource(R.drawable.bg_button_outline);
+        tabAccepted.setTextColor(getResources().getColor(R.color.text_muted, null));
         
         // Hide all recycler views
         matchesRecyclerView.setVisibility(View.GONE);
         myRequestsRecyclerView.setVisibility(View.GONE);
         receivedMatchesRecyclerView.setVisibility(View.GONE);
+
+        updateEmptyStateCopy();
         
         if (tab.equals("browse")) {
             // Switch to Browse tab
@@ -250,6 +282,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             
             matchesRecyclerView.setVisibility(View.VISIBLE);
             filterScroll.setVisibility(View.VISIBLE);
+            searchCardView.setVisibility(View.VISIBLE);
             searchSkillsInput.setVisibility(View.VISIBLE);
             
             loadMatches(currentFilter);
@@ -260,19 +293,21 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             
             myRequestsRecyclerView.setVisibility(View.VISIBLE);
             filterScroll.setVisibility(View.GONE);
+            searchCardView.setVisibility(View.GONE);
             searchSkillsInput.setVisibility(View.GONE);
             
             loadMyRequests();
-        } else if (tab.equals("receiver")) {
-            // Switch to Receiver tab
-            tabReceiver.setBackgroundResource(R.drawable.bg_button_solid_blue);
-            tabReceiver.setTextColor(getResources().getColor(R.color.text_white, null));
+        } else if (tab.equals("accepted")) {
+            // Switch to Accepted tab
+            tabAccepted.setBackgroundResource(R.drawable.bg_button_solid_blue);
+            tabAccepted.setTextColor(getResources().getColor(R.color.text_white, null));
             
             receivedMatchesRecyclerView.setVisibility(View.VISIBLE);
             filterScroll.setVisibility(View.GONE);
+            searchCardView.setVisibility(View.GONE);
             searchSkillsInput.setVisibility(View.GONE);
             
-            loadReceivedMatches();
+            loadAcceptedMatches();
         }
     }
 
@@ -415,9 +450,9 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         });
     }
 
-    // ==================== Load Received Matches ====================
+    // ==================== Load Accepted Matches ====================
     
-    private void loadReceivedMatches() {
+    private void loadAcceptedMatches() {
         showLoading(true);
         
         Call<List<MatchRequestResponse>> call = apiService.getReceivedMatchRequests();
@@ -506,36 +541,134 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
 
     @Override
     public void onSetupSprint(MatchRequestResponse match) {
-        if (match == null) return;
-        
-        // Navigate to SprintSetupActivity with match details
-        Intent intent = new Intent(getActivity(), SprintSetupActivity.class);
-        intent.putExtra("MATCH_ID", match.id);
-        
-        // Get partner name and UID from the match requester
-        String partnerName = "Partner";
-        String partnerUID = null;
-        
-        if (match.user != null) {
-            if (match.user.fullName != null) {
-                partnerName = match.user.fullName;
-            }
-            if (match.user.uid != null) {
-                partnerUID = match.user.uid;
-            }
+        if (match == null || match.id == null || match.id.isEmpty()) return;
+
+        String fallbackName = "Partner";
+        if (match.user != null && match.user.fullName != null && !match.user.fullName.isEmpty()) {
+            fallbackName = match.user.fullName;
         }
-        
-        // Get current user's email
+
+        fetchMatchDetailsAndOpenSetup(match.id, fallbackName);
+    }
+
+    @Override
+    public void onViewSprint(MatchRequestResponse match) {
+        if (match == null) return;
+
+        if (match.linkedSprintId != null && !match.linkedSprintId.isEmpty()) {
+            Intent intent = new Intent(getActivity(), SprintDetailsActivity.class);
+            intent.putExtra("SPRINT_ID", match.linkedSprintId);
+            startActivity(intent);
+            return;
+        }
+
+        openSprintDetailsFromMatch(match.id);
+    }
+
+    @Override
+    public void onOpenReceivedMatch(MatchRequestResponse match) {
+        if (match == null || match.id == null || match.id.isEmpty()) {
+            return;
+        }
+
+        openSprintDetailsFromMatch(match.id);
+    }
+
+    private void fetchMatchDetailsAndOpenSetup(String matchId, String fallbackName) {
+        if (apiService == null || matchId == null || matchId.isEmpty()) return;
+
+        Call<Map<String, Object>> call = apiService.getMatchDetails(matchId);
+        call.enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(@NonNull Call<Map<String, Object>> call, @NonNull Response<Map<String, Object>> response) {
+                String partnerName = fallbackName;
+                String partnerUid = null;
+
+                if (response.isSuccessful() && response.body() != null) {
+                    Map<String, Object> body = response.body();
+                    Object partnerNameObj = body.get("partner_name");
+                    Object partnerUidObj = body.get("partner_uid");
+
+                    if (partnerNameObj instanceof String && !((String) partnerNameObj).isEmpty()) {
+                        partnerName = (String) partnerNameObj;
+                    }
+                    if (partnerUidObj instanceof String && !((String) partnerUidObj).isEmpty()) {
+                        partnerUid = (String) partnerUidObj;
+                    }
+                }
+
+                openSprintSetup(matchId, partnerName, partnerUid);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Map<String, Object>> call, @NonNull Throwable t) {
+                openSprintSetup(matchId, fallbackName, null);
+            }
+        });
+    }
+
+    private void openSprintSetup(String matchId, String partnerName, String partnerUID) {
+        Intent intent = new Intent(getActivity(), SprintSetupActivity.class);
+        intent.putExtra("MATCH_ID", matchId);
+        intent.putExtra("PARTNER_NAME", partnerName);
+        intent.putExtra("PARTNER_UID", partnerUID);
+
         String userEmail = null;
         if (FirebaseAuth.getInstance().getCurrentUser() != null) {
             userEmail = FirebaseAuth.getInstance().getCurrentUser().getEmail();
         }
-        
-        intent.putExtra("PARTNER_NAME", partnerName);
-        intent.putExtra("PARTNER_UID", partnerUID);
         intent.putExtra("USER_EMAIL", userEmail);
-        
+
         startActivity(intent);
+    }
+
+    private void openSprintDetailsFromMatch(String matchId) {
+        if (apiService == null || matchId == null || matchId.isEmpty()) {
+            return;
+        }
+
+        showLoading(true);
+        Call<List<SprintSessionResponse>> call = apiService.getUserSprints();
+        call.enqueue(new Callback<List<SprintSessionResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<SprintSessionResponse>> call,
+                                   @NonNull Response<List<SprintSessionResponse>> response) {
+                showLoading(false);
+
+                if (!response.isSuccessful() || response.body() == null) {
+                    Toast.makeText(getContext(), "Unable to open sprint details", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                SprintSessionResponse linkedSprint = null;
+                for (SprintSessionResponse sprint : response.body()) {
+                    if (sprint.matchId != null && sprint.matchId.equals(matchId)) {
+                        linkedSprint = sprint;
+                        break;
+                    }
+                }
+
+                if (linkedSprint == null || linkedSprint.id == null || linkedSprint.id.isEmpty()) {
+                    Toast.makeText(getContext(), "Sprint is not setup yet", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                if ("end".equalsIgnoreCase(linkedSprint.status)) {
+                    Toast.makeText(getContext(), "This sprint has ended", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                Intent intent = new Intent(getActivity(), SprintDetailsActivity.class);
+                intent.putExtra("SPRINT_ID", linkedSprint.id);
+                startActivity(intent);
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Throwable t) {
+                showLoading(false);
+                Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ==================== UI State Management ====================
@@ -547,8 +680,25 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             matchesRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
         } else if (currentTab.equals("requests")) {
             myRequestsRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
-        } else if (currentTab.equals("receiver")) {
+        } else if (currentTab.equals("accepted")) {
             receivedMatchesRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
+        }
+    }
+
+    private void updateEmptyStateCopy() {
+        if (emptyStateTitle == null || emptyStateSubtitle == null) {
+            return;
+        }
+
+        if ("browse".equals(currentTab)) {
+            emptyStateTitle.setText("No Matches Found");
+            emptyStateSubtitle.setText("Check back later for new collaboration opportunities");
+        } else if ("requests".equals(currentTab)) {
+            emptyStateTitle.setText("No Requests Created Yet");
+            emptyStateSubtitle.setText("Create your first request from the + Create button");
+        } else {
+            emptyStateTitle.setText("No Accepted Requests Yet");
+            emptyStateSubtitle.setText("Accepted requests from Browse will appear here");
         }
     }
 

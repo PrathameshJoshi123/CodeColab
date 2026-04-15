@@ -27,6 +27,7 @@ public class SprintSummaryActivity extends AppCompatActivity {
     private ProgressBar loadingProgress;
     private TextView tvPartnerName;
     private CodeCollabApiService apiService;
+    private boolean isSprintConfirmed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,14 +77,14 @@ public class SprintSummaryActivity extends AppCompatActivity {
 
         // 4. Navigation: Launch the Live Sprint
         btnStartNow.setOnClickListener(v -> {
-            Intent intent = new Intent(SprintSummaryActivity.this, LiveSprintActivity.class);
+            if (!isSprintConfirmed) {
+                Toast.makeText(SprintSummaryActivity.this,
+                        "Confirm and notify partner before starting", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-            // Continue carrying the context forward
-            intent.putExtra("USER_EMAIL", userEmail);
-            intent.putExtra("PARTNER_NAME", partnerName);
-            intent.putExtra("SESSION_LENGTH", sessionLength);
+            Intent intent = new Intent(SprintSummaryActivity.this, SprintDetailsActivity.class);
             intent.putExtra("SPRINT_ID", sprintId);
-
             startActivity(intent);
         });
 
@@ -220,8 +221,8 @@ public class SprintSummaryActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
                     Toast.makeText(SprintSummaryActivity.this,
                             "Sprint confirmed! Notification sent to partner", Toast.LENGTH_SHORT).show();
-                    
-                    // Optionally close the activity or disable the button
+
+                    isSprintConfirmed = true;
                     btnConfirmSprint.setEnabled(false);
                     btnConfirmSprint.setText("Sprint Confirmed ✅");
                 } else {

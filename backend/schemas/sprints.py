@@ -42,6 +42,10 @@ class SprintSession(BaseModel):
     participants: List[str]
     participantDetails: Optional[List[ParticipantDetail]] = None
     match_id: Optional[str] = None  # Match ID for this sprint
+    confirmed_by: Optional[str] = None
+    confirmed_at: Optional[datetime] = None
+    joined_participants: Optional[List[str]] = None
+    all_participants_joined: Optional[bool] = False
 
 class SprintSessionWithDetails(BaseModel):
     """Sprint session response with enhanced participant details"""
@@ -109,7 +113,7 @@ class SprintTodo(BaseModel):
 
 class ScratchpadCreate(BaseModel):
     """Scratchpad content creation/update"""
-    sprint_id: str
+    sprint_id: Optional[str] = None
     content: str
 
 class ScratchpadUpdate(BaseModel):

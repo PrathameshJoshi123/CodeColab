@@ -91,7 +91,7 @@ public interface CodeCollabApiService {
             @Body UserSkillUpdateRequest request
     );
     
-    @GET("/users/{userId}/skills")
+        @GET("/skills/{userId}/skills")
     Call<List<UserSkillResponse>> getUserSkills(@Path("userId") String userId);
     
     // ==================== Sprints ====================
@@ -201,7 +201,7 @@ public interface CodeCollabApiService {
     @POST("/chat/conversations/{sprintId}/messages")
     Call<Map<String, Object>> sendMessage(
             @Path("sprintId") String sprintId,
-            @Body Map<String, String> messageData
+            @Body Map<String, Object> messageData
     );
     
     @GET("/chat/conversations/{sprintId}/messages")

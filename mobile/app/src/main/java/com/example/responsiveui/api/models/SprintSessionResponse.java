@@ -42,6 +42,18 @@ public class SprintSessionResponse {
     
     @SerializedName("participantDetails")
     public List<ParticipantDetail> participantDetails;
+
+    @SerializedName("confirmed_by")
+    public String confirmedBy;
+
+    @SerializedName("confirmed_at")
+    public String confirmedAt;
+
+    @SerializedName("joined_participants")
+    public List<String> joinedParticipants;
+
+    @SerializedName("all_participants_joined")
+    public Boolean allParticipantsJoined;
     
     @SerializedName("match_id")
     public String matchId;

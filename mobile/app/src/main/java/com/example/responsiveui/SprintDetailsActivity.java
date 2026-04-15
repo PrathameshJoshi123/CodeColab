@@ -17,8 +17,10 @@ import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
 import com.example.responsiveui.api.TokenManager;
 import com.example.responsiveui.api.models.SprintSessionResponse;
+import com.example.responsiveui.api.models.SprintSessionUpdateRequest;
 import com.example.responsiveui.api.models.SprintTodoResponse;
 import com.example.responsiveui.api.models.SprintTodoCreateRequest;
+import com.example.responsiveui.api.models.SprintTodoUpdateRequest;
 import com.example.responsiveui.api.models.ParticipantDetail;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -152,7 +154,20 @@ public class SprintDetailsActivity extends AppCompatActivity {
         tvDuration.setText(sprint.durationMinutes + " minutes");
         
         // Display participants
-        if (sprint.participants != null) {
+        if (sprint.participantDetails != null && !sprint.participantDetails.isEmpty()) {
+            participantsLayout.removeAllViews();
+            for (ParticipantDetail participant : sprint.participantDetails) {
+                TextView tvParticipant = new TextView(this);
+                String participantName = resolveParticipantDisplayName(participant);
+                if (participantName == null || participantName.isEmpty()) {
+                    participantName = "Partner";
+                }
+                tvParticipant.setText("• " + participantName);
+                tvParticipant.setTextColor(getResources().getColor(R.color.text_white, null));
+                tvParticipant.setTextSize(14);
+                participantsLayout.addView(tvParticipant);
+            }
+        } else if (sprint.participants != null) {
             participantsLayout.removeAllViews();
             for (String participant : sprint.participants) {
                 TextView tvParticipant = new TextView(this);
@@ -174,12 +189,13 @@ public class SprintDetailsActivity extends AppCompatActivity {
     
     private void updateActionButtons() {
         boolean isCreator = currentSprint.createdBy != null && currentSprint.createdBy.equals(currentUserId);
-        boolean isConfirmed = "confirmed".equalsIgnoreCase(currentSprint.status);
-        boolean isLive = "live".equalsIgnoreCase(currentSprint.status);
+        boolean isSetup = "setupped".equalsIgnoreCase(currentSprint.status);
+        boolean isStarted = "started".equalsIgnoreCase(currentSprint.status);
+        boolean isEnded = "end".equalsIgnoreCase(currentSprint.status);
         
         if (btnJoinSprint != null) {
-            // Show join button if user is NOT creator and sprint is confirmed
-            if (!isCreator && (isConfirmed || isLive)) {
+            // Show join button if user is NOT creator and sprint is in setup/started phase
+            if (!isCreator && !isEnded && (isSetup || isStarted)) {
                 btnJoinSprint.setVisibility(View.VISIBLE);
             } else {
                 btnJoinSprint.setVisibility(View.GONE);
@@ -187,8 +203,8 @@ public class SprintDetailsActivity extends AppCompatActivity {
         }
         
         if (btnStartSprint != null) {
-            // Show start button if user is creator and sprint is scheduled
-            if (isCreator && "scheduled".equalsIgnoreCase(currentSprint.status)) {
+            // Show start button only for creator after setup confirmation
+            if (isCreator && isSetup) {
                 btnStartSprint.setVisibility(View.VISIBLE);
             } else {
                 btnStartSprint.setVisibility(View.GONE);
@@ -202,9 +218,8 @@ public class SprintDetailsActivity extends AppCompatActivity {
             return;
         }
         
-        // Check if sprint is confirmed before allowing join
-        if (!"confirmed".equalsIgnoreCase(currentSprint.status) && !"live".equalsIgnoreCase(currentSprint.status)) {
-            Toast.makeText(this, "You can only join once the creator starts the sprint", Toast.LENGTH_SHORT).show();
+        if ("end".equalsIgnoreCase(currentSprint.status)) {
+            Toast.makeText(this, "This sprint has already ended", Toast.LENGTH_SHORT).show();
             return;
         }
         
@@ -243,26 +258,34 @@ public class SprintDetailsActivity extends AppCompatActivity {
             Toast.makeText(this, "Sprint data not loaded", Toast.LENGTH_SHORT).show();
             return;
         }
+
+        if (!"setupped".equalsIgnoreCase(currentSprint.status)) {
+            Toast.makeText(this, "Sprint is already started or ended", Toast.LENGTH_SHORT).show();
+            return;
+        }
         
         showLoading(true);
-        
-        Call<java.util.Map<String, Object>> call = apiService.confirmSprintSession(sprintId);
-        call.enqueue(new Callback<java.util.Map<String, Object>>() {
+
+        SprintSessionUpdateRequest request = new SprintSessionUpdateRequest();
+        request.status = "started";
+
+        Call<SprintSessionResponse> call = apiService.updateSprintSession(sprintId, request);
+        call.enqueue(new Callback<SprintSessionResponse>() {
             @Override
-            public void onResponse(Call<java.util.Map<String, Object>> call, Response<java.util.Map<String, Object>> response) {
+            public void onResponse(Call<SprintSessionResponse> call, Response<SprintSessionResponse> response) {
                 showLoading(false);
                 
-                if (response.isSuccessful()) {
-                    Toast.makeText(SprintDetailsActivity.this, "Sprint started! Partner will be notified.", Toast.LENGTH_SHORT).show();
-                    // Reload sprint details to get updated status
-                    loadSprintDetails();
+                if (response.isSuccessful() && response.body() != null) {
+                    currentSprint = response.body();
+                    Toast.makeText(SprintDetailsActivity.this, "Sprint started", Toast.LENGTH_SHORT).show();
+                    navigateToLiveSprint();
                 } else {
                     Toast.makeText(SprintDetailsActivity.this, "Failed to start sprint", Toast.LENGTH_SHORT).show();
                 }
             }
             
             @Override
-            public void onFailure(Call<java.util.Map<String, Object>> call, Throwable t) {
+            public void onFailure(Call<SprintSessionResponse> call, Throwable t) {
                 showLoading(false);
                 Toast.makeText(SprintDetailsActivity.this, "Error starting sprint: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
@@ -285,28 +308,71 @@ public class SprintDetailsActivity extends AppCompatActivity {
         if (currentSprint.participantDetails != null && currentSprint.participantDetails.size() > 0) {
             // Find partner from participantDetails (not current user)
             for (ParticipantDetail participant : currentSprint.participantDetails) {
-                if (!participant.userId.equals(currentUserId)) {
-                    partnerName = participant.fullName != null && !participant.fullName.isEmpty() ? 
-                            participant.fullName : participant.userId;
-                    break;
+                if (participant == null) {
+                    continue;
                 }
+
+                String participantId = participant.userId != null ? participant.userId : "";
+                if (currentUserId != null && currentUserId.equals(participantId)) {
+                    continue;
+                }
+
+                partnerName = resolveParticipantDisplayName(participant);
+                if (partnerName == null || partnerName.isEmpty()) {
+                    partnerName = "Partner";
+                }
+                break;
             }
         } else if (currentSprint.participants != null && currentSprint.participants.size() > 0) {
             // Fallback to participants list if participantDetails is not available
             for (String participant : currentSprint.participants) {
-                if (!participant.equals(currentUserId)) {
-                    partnerName = participant;
-                    break;
+                if (participant == null || participant.isEmpty()) {
+                    continue;
                 }
+                if (currentUserId != null && currentUserId.equals(participant)) {
+                    continue;
+                }
+                partnerName = participant;
+                break;
             }
         }
         
-        if (partnerName != null) {
-            intent.putExtra("PARTNER_NAME", partnerName);
+        if (partnerName == null || partnerName.trim().isEmpty()) {
+            partnerName = "Partner";
         }
+
+        intent.putExtra("PARTNER_NAME", partnerName);
         
         startActivity(intent);
         finish();
+    }
+
+    private String resolveParticipantDisplayName(ParticipantDetail participant) {
+        if (participant == null) {
+            return null;
+        }
+
+        if (participant.fullName != null && !participant.fullName.trim().isEmpty()) {
+            return participant.fullName.trim();
+        }
+
+        if (participant.email != null && !participant.email.trim().isEmpty()) {
+            return nameFromEmail(participant.email.trim());
+        }
+
+        if (participant.userId != null) {
+            return participant.userId;
+        }
+
+        return null;
+    }
+
+    private String nameFromEmail(String email) {
+        int atIndex = email.indexOf('@');
+        if (atIndex > 0) {
+            return email.substring(0, atIndex);
+        }
+        return email;
     }
     
     // ==================== Todo Management ====================
@@ -418,8 +484,22 @@ public class SprintDetailsActivity extends AppCompatActivity {
     }
     
     private void updateTodoStatus(String todoId, boolean isCompleted) {
-        // Update todo status via API
-        // Implementation will call updateSprintTodo endpoint
+        SprintTodoUpdateRequest request = new SprintTodoUpdateRequest(isCompleted);
+
+        Call<SprintTodoResponse> call = apiService.updateSprintTodo(sprintId, todoId, request);
+        call.enqueue(new Callback<SprintTodoResponse>() {
+            @Override
+            public void onResponse(Call<SprintTodoResponse> call, Response<SprintTodoResponse> response) {
+                if (!response.isSuccessful()) {
+                    Toast.makeText(SprintDetailsActivity.this, "Failed to update todo", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<SprintTodoResponse> call, Throwable t) {
+                Toast.makeText(SprintDetailsActivity.this, "Error updating todo", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
     
     private void deleteTodo(String todoId) {

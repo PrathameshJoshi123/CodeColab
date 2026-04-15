@@ -6,6 +6,12 @@ import com.google.gson.annotations.SerializedName;
  * User skill response
  */
 public class UserSkillResponse {
+    @SerializedName("name")
+    public String name;
+
+    @SerializedName("category")
+    public String category;
+
     @SerializedName("id")
     public String id;
     

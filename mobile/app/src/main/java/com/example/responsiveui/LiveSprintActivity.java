@@ -1,5 +1,6 @@
 package com.example.responsiveui;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
@@ -71,6 +72,8 @@ public class LiveSprintActivity extends AppCompatActivity {
     private boolean timerStarted = false;
     private boolean allParticipantsJoined = false;
     private boolean scratchpadLoaded = false;
+    private boolean isApplyingRemoteScratchpadUpdate = false;
+    private String lastSyncedScratchpadContent = "";
     private long lastScratchpadSaveTime = 0;
     private static final long SCRATCHPAD_SAVE_DELAY_MS = 2000;  // Auto-save every 2 seconds
     
@@ -101,6 +104,7 @@ public class LiveSprintActivity extends AppCompatActivity {
         // Timer will be started after checking participants status
         setupButtonListeners();
         setupScratchpadListener();  // Setup auto-save for scratchpad
+        startScratchpadSync();
     }
     
     // ==================== View Initialization ====================
@@ -184,15 +188,27 @@ public class LiveSprintActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     Map<String, Object> status = response.body();
                     Boolean allJoined = (Boolean) status.get("all_joined");
-                    
-                    if (allJoined != null && allJoined) {
+
+                    Object sprintStatusObj = status.get("status");
+                    String sprintStatus = sprintStatusObj != null ? sprintStatusObj.toString() : "setupped";
+
+                    if ("end".equalsIgnoreCase(sprintStatus)) {
+                        Toast.makeText(LiveSprintActivity.this, "Sprint has ended", Toast.LENGTH_SHORT).show();
+                        finish();
+                        return;
+                    }
+
+                    if (allJoined != null && allJoined && "started".equalsIgnoreCase(sprintStatus)) {
                         allParticipantsJoined = true;
                         if (!timerStarted) {
                             startCountdownTimer();
                         }
                     } else {
-                        // Poll again after 2 seconds
-                        tvTimer.setText("Waiting for partner...");
+                        if (allJoined == null || !allJoined) {
+                            tvTimer.setText("Waiting for partner...");
+                        } else {
+                            tvTimer.setText("Waiting for host to start...");
+                        }
                         handler.postDelayed(LiveSprintActivity.this::checkParticipantsStatus, 2000);
                     }
                 } else {
@@ -344,7 +360,11 @@ public class LiveSprintActivity extends AppCompatActivity {
                         if (data != null && etScratchpad != null) {
                             Object content = data.get("content");
                             if (content != null) {
-                                etScratchpad.setText(content.toString());
+                                String contentValue = content.toString();
+                                isApplyingRemoteScratchpadUpdate = true;
+                                etScratchpad.setText(contentValue);
+                                isApplyingRemoteScratchpadUpdate = false;
+                                lastSyncedScratchpadContent = contentValue;
                             }
                         }
                     }
@@ -366,9 +386,9 @@ public class LiveSprintActivity extends AppCompatActivity {
         }
         
         String content = etScratchpad.getText().toString().trim();
-        
-        if (content.isEmpty()) {
-            return;  // Don't save empty scratchpad
+
+        if (content.equals(lastSyncedScratchpadContent)) {
+            return;
         }
         
         Map<String, String> scratchpadData = new java.util.HashMap<>();
@@ -378,7 +398,9 @@ public class LiveSprintActivity extends AppCompatActivity {
         call.enqueue(new Callback<Map<String, Object>>() {
             @Override
             public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
-                // Silently succeed - scratchpad saved
+                if (response.isSuccessful()) {
+                    lastSyncedScratchpadContent = content;
+                }
             }
             
             @Override
@@ -402,6 +424,9 @@ public class LiveSprintActivity extends AppCompatActivity {
             
             @Override
             public void afterTextChanged(android.text.Editable s) {
+                if (isApplyingRemoteScratchpadUpdate) {
+                    return;
+                }
                 // Auto-save scratchpad with delay
                 handler.removeCallbacks(saveScratchpadRunnable);
                 long timeSinceLastSave = System.currentTimeMillis() - lastScratchpadSaveTime;
@@ -410,6 +435,62 @@ public class LiveSprintActivity extends AppCompatActivity {
             }
         });
     }
+
+    private void syncScratchpadFromServer() {
+        if (!scratchpadLoaded || sprintId == null || sprintId.isEmpty() || etScratchpad == null) {
+            return;
+        }
+
+        Call<Map<String, Object>> call = apiService.getScratchpad(sprintId);
+        call.enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (!response.isSuccessful() || response.body() == null) {
+                    return;
+                }
+
+                Map<String, Object> responseBody = response.body();
+                Boolean exists = (Boolean) responseBody.get("exists");
+                if (exists == null || !exists) {
+                    return;
+                }
+
+                Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
+                if (data == null || data.get("content") == null) {
+                    return;
+                }
+
+                String remoteContent = data.get("content").toString();
+                String localContent = etScratchpad.getText().toString();
+
+                if (!remoteContent.equals(localContent)) {
+                    isApplyingRemoteScratchpadUpdate = true;
+                    etScratchpad.setText(remoteContent);
+                    etScratchpad.setSelection(remoteContent.length());
+                    isApplyingRemoteScratchpadUpdate = false;
+                }
+
+                lastSyncedScratchpadContent = remoteContent;
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable t) {
+                // Keep UI responsive if sync fails intermittently.
+            }
+        });
+    }
+
+    private void startScratchpadSync() {
+        handler.postDelayed(scratchpadSyncRunnable, 2000);
+    }
+
+    private final Runnable scratchpadSyncRunnable = new Runnable() {
+        @Override
+        public void run() {
+            syncScratchpadFromServer();
+            handler.postDelayed(this, 2000);
+        }
+    };
     
     private final Runnable saveScratchpadRunnable = new Runnable() {
         @Override
@@ -567,27 +648,43 @@ public class LiveSprintActivity extends AppCompatActivity {
         if (countDownTimer != null) {
             countDownTimer.cancel();
         }
-        
-        // Update sprint session status to completed (optional)
+
+        // Persist end state on backend
         updateSprintStatusToCompleted();
-        
-        Toast.makeText(this, "Sprint session ended", Toast.LENGTH_SHORT).show();
-        finish();
     }
     
     private void updateSprintStatusToCompleted() {
         if (sprintId == null) {
+            finish();
             return;
         }
-        
-        // Optionally update the sprint session status to completed
-        // This would require an endpoint if not already available
-        // For now, we'll just finish the activity
+
+        Call<SprintSessionResponse> call = apiService.completeSprintSession(sprintId);
+        call.enqueue(new Callback<SprintSessionResponse>() {
+            @Override
+            public void onResponse(Call<SprintSessionResponse> call, Response<SprintSessionResponse> response) {
+                Toast.makeText(LiveSprintActivity.this, "Sprint session ended", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+
+            @Override
+            public void onFailure(Call<SprintSessionResponse> call, Throwable t) {
+                Toast.makeText(LiveSprintActivity.this, "Error ending sprint: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        });
     }
     
     private void openChat() {
-        Toast.makeText(this, "Chat feature coming soon", Toast.LENGTH_SHORT).show();
-        // TODO: Implement chat navigation
+        if (sprintId == null || sprintId.isEmpty()) {
+            Toast.makeText(this, "Sprint ID not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Intent chatIntent = new Intent(this, ChatDetailActivity.class);
+        chatIntent.putExtra("SPRINT_ID", sprintId);
+        chatIntent.putExtra("PARTNER_NAME", partnerName != null ? partnerName : "Partner");
+        startActivity(chatIntent);
     }
     
     // ==================== Lifecycle ====================
@@ -597,6 +694,10 @@ public class LiveSprintActivity extends AppCompatActivity {
         super.onDestroy();
         if (countDownTimer != null) {
             countDownTimer.cancel();
+        }
+        if (handler != null) {
+            handler.removeCallbacks(saveScratchpadRunnable);
+            handler.removeCallbacks(scratchpadSyncRunnable);
         }
     }
 }

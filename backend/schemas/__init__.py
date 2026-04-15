@@ -51,6 +51,7 @@ from .matching import (
 
 # Sprint Domain
 from .sprints import (
+    ParticipantDetail,
     SprintSessionCreate,
     SprintSessionUpdate,
     SprintSession,
@@ -59,7 +60,10 @@ from .sprints import (
     SprintTask,
     SprintTodoCreate,
     SprintTodoUpdate,
-    SprintTodo
+    SprintTodo,
+    ScratchpadCreate,
+    ScratchpadUpdate,
+    Scratchpad,
 )
 
 # Chat Domain
@@ -131,9 +135,16 @@ __all__ = [
     "SprintSessionCreate",
     "SprintSessionUpdate",
     "SprintSession",
+    "ParticipantDetail",
     "SprintTaskCreate",
     "SprintTaskUpdate",
     "SprintTask",
+    "SprintTodoCreate",
+    "SprintTodoUpdate",
+    "SprintTodo",
+    "ScratchpadCreate",
+    "ScratchpadUpdate",
+    "Scratchpad",
     # Chat
     "MessageCreate",
     "Message",

@@ -17,8 +17,17 @@ class MatchRequest(BaseModel):
     userId: str
     session_type: str
     message: str
+    required_skills: Optional[List[str]] = None
     status: str
     scheduled_date_time: Optional[datetime] = None
+    accepted_by: Optional[str] = None
+    accepted_at: Optional[datetime] = None
+    rejected_by: Optional[str] = None
+    rejected_at: Optional[datetime] = None
+    linked_sprint_id: Optional[str] = None
+    sprint_status: Optional[str] = None
+    is_exhausted: Optional[bool] = False
+    can_setup_sprint: Optional[bool] = False
     created_at: datetime
 
 # ==================== Match User Profile Models ====================

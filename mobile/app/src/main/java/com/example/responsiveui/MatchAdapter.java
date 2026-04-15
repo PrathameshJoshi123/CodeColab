@@ -29,6 +29,7 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
 
     public interface MatchActionListener {
         void onAccept(MatchRequestResponse match);
+        void onOpenReceivedMatch(MatchRequestResponse match);
     }
 
     public MatchAdapter(List<MatchRequestResponse> matches, Context context) {
@@ -187,10 +188,18 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
                 // Received tab - no action buttons
                 btnAccept.setVisibility(View.GONE);
                 btnReject.setVisibility(View.GONE);
+
+                itemView.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onOpenReceivedMatch(match);
+                    }
+                });
             } else {
                 // Browse tab - show accept button only
                 btnAccept.setVisibility(View.VISIBLE);
                 btnReject.setVisibility(View.GONE);
+
+                itemView.setOnClickListener(null);
                 
                 btnAccept.setOnClickListener(v -> {
                     if (listener != null) {
