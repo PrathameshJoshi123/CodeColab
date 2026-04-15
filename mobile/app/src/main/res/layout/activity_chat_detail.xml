@@ -41,6 +41,7 @@
             android:layout_toEndOf="@id/ivAvatar"
             android:orientation="vertical">
             <TextView
+                android:id="@+id/tvPartnerName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Sarah Jenkins"
@@ -74,6 +75,7 @@
     </RelativeLayout>
 
     <ScrollView
+        android:id="@+id/scrollMessages"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:fillViewport="true"
@@ -81,6 +83,7 @@
         app:layout_constraintTop_toBottomOf="@id/chatHeader">
 
         <LinearLayout
+            android:id="@+id/messagesContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
@@ -163,6 +166,7 @@
             app:tint="@color/text_muted" />
 
         <EditText
+            android:id="@+id/messageInput"
             android:layout_width="0dp"
             android:layout_height="50dp"
             android:layout_marginHorizontal="12dp"
@@ -175,6 +179,7 @@
             android:textSize="14sp" />
 
         <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/btnSendMessage"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@android:drawable/ic_menu_send"
@@ -182,5 +187,15 @@
             app:fabCustomSize="50dp"
             app:tint="@color/text_white" />
     </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/loadingProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

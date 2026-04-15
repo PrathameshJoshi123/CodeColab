@@ -57,6 +57,9 @@ from .sprints import (
     SprintTaskCreate,
     SprintTaskUpdate,
     SprintTask,
+    SprintTodoCreate,
+    SprintTodoUpdate,
+    SprintTodo
 )
 
 # Chat Domain

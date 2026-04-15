@@ -149,6 +149,7 @@
                     android:gravity="center"
                     android:padding="16dp">
                     <TextView
+                        android:id="@+id/tvFocusSkill"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Algorithms\nFocus"
@@ -208,6 +209,17 @@
             app:cornerRadius="12dp" />
 
         <Button
+            android:id="@+id/btnConfirmSprint"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:text="Confirm Sprint &amp; Notify Partner"
+            android:textAllCaps="false"
+            android:textColor="@color/text_white"
+            android:backgroundTint="@color/brand_blue"
+            app:cornerRadius="12dp" />
+
+        <Button
             android:id="@+id/btnEdit"
             android:layout_width="match_parent"
             android:layout_height="56dp"
@@ -220,5 +232,15 @@
             app:strokeColor="@color/text_muted"
             app:strokeWidth="1dp" />
     </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/loadingProgress"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

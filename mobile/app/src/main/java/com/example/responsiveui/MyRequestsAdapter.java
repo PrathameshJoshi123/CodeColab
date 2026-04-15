@@ -14,7 +14,7 @@ import java.util.List;
 /**
  * ==================== MyRequestsAdapter ====================
  * RecyclerView adapter for displaying user's own match requests
- * Shows status (pending, accepted, rejected) and allows cancellation
+ * Shows status (pending, accepted, rejected) and allows cancellation or sprint setup
  */
 public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.MyRequestViewHolder> {
     
@@ -24,6 +24,7 @@ public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.My
 
     public interface MyRequestActionListener {
         void onCancel(MatchRequestResponse request);
+        void onSetupSprint(MatchRequestResponse request);
     }
 
     public MyRequestsAdapter(List<MatchRequestResponse> requests, Context context) {
@@ -111,15 +112,34 @@ public class MyRequestsAdapter extends RecyclerView.Adapter<MyRequestsAdapter.My
                 createdAtText.setText("Created: " + request.createdAt);
             }
 
-            // Cancel button visibility and action
-            boolean canCancel = "pending".equals(status.toLowerCase());
-            btnCancel.setVisibility(canCancel ? View.VISIBLE : View.GONE);
-            
-            btnCancel.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onCancel(request);
-                }
-            });
+            // ==================== Button Actions ====================
+            // Show different buttons based on status
+            if ("accepted".equals(status.toLowerCase())) {
+                // Accepted request: show Setup Sprint button
+                btnCancel.setText("Setup Sprint");
+                btnCancel.setBackgroundResource(R.drawable.bg_button_solid_blue);
+                btnCancel.setVisibility(View.VISIBLE);
+                
+                btnCancel.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onSetupSprint(request);
+                    }
+                });
+            } else if ("pending".equals(status.toLowerCase())) {
+                // Pending request: show Cancel button
+                btnCancel.setText("Cancel Request");
+                btnCancel.setBackgroundResource(R.drawable.bg_button_outline);
+                btnCancel.setVisibility(View.VISIBLE);
+                
+                btnCancel.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onCancel(request);
+                    }
+                });
+            } else {
+                // Rejected or other status: hide button
+                btnCancel.setVisibility(View.GONE);
+            }
         }
     }
 }

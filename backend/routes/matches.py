@@ -138,6 +138,91 @@ async def get_user_match_requests(credentials = Depends(security)):
             detail=str(e)
         )
 
+@router.get("/user/received", response_model=list[dict])
+async def get_received_match_requests(credentials = Depends(security)):
+    """Get match requests received/accepted by current user (matches they accepted from others)"""
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        # Get all match requests accepted by current user
+        received = []
+        
+        # Collect all requester IDs first
+        requester_ids = []
+        match_docs = list(db.collection("matchRequests").where(
+            filter=FieldFilter("accepted_by", "==", user_id)
+        ).stream())
+        
+        for doc in match_docs:
+            request_data = doc.to_dict()
+            requester_ids.append(request_data.get("userId"))
+        
+        # Batch fetch all user documents
+        user_cache = {}
+        for requester_id in set(requester_ids):
+            user_doc = db.collection("users").document(requester_id).get()
+            user_cache[requester_id] = user_doc.to_dict() if user_doc.exists else {}
+        
+        # Batch fetch all user skills for all requesters
+        user_skills_cache = {}
+        for requester_id in set(requester_ids):
+            user_skills = []
+            skills_query = db.collection("userSkills").where(
+                filter=FieldFilter("userId", "==", requester_id)
+            ).stream()
+            
+            # Collect skill IDs to fetch skill details in batch
+            skill_ids = []
+            skill_docs = list(skills_query)
+            for skill_doc in skill_docs:
+                skill_ids.append(skill_doc.to_dict().get("skillId"))
+            
+            # Fetch all skill details
+            skill_details_cache = {}
+            for skill_id in set(skill_ids):
+                skill_ref = db.collection("skills").document(skill_id).get()
+                if skill_ref.exists:
+                    skill_details_cache[skill_id] = skill_ref.to_dict()
+            
+            # Build user skills with cached skill details
+            for skill_doc in skill_docs:
+                skill_data = skill_doc.to_dict()
+                skill_id = skill_data.get("skillId")
+                if skill_id in skill_details_cache:
+                    skill_info = skill_details_cache[skill_id]
+                    user_skills.append({
+                        "id": skill_id,
+                        "name": skill_info.get("name"),
+                        "proficiency_level": skill_data.get("proficiency_level"),
+                        "years_of_experience": skill_data.get("years_of_experience")
+                    })
+            
+            user_skills_cache[requester_id] = user_skills
+        
+        # Build response using cached data
+        for doc in match_docs:
+            request_data = doc.to_dict()
+            requester_id = request_data.get("userId")
+            
+            match_with_user = {
+                **request_data,
+                "user": user_cache.get(requester_id, {}),
+                "user_skills": user_skills_cache.get(requester_id, [])
+            }
+            
+            received.append(match_with_user)
+        
+        return received
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @router.put("/{request_id}/accept", response_model=MatchRequest)
 async def accept_match_request(
     request_id: str,
@@ -286,6 +371,77 @@ async def cancel_match_request(
         db.collection("matchRequests").document(request_id).delete()
         
         return {"detail": "Match request deleted"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/{match_id}/details", response_model=dict)
+async def get_match_details(
+    match_id: str,
+    credentials = Depends(security)
+):
+    """
+    Get match request details with partner information
+    Used for sprint setup to fetch partner name and FCM token
+    """
+    try:
+        user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        # Get the match request
+        match_doc = db.collection("matchRequests").document(match_id).get()
+        if not match_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Match request not found"
+            )
+        
+        match_data = match_doc.to_dict()
+        
+        # Determine who the partner is based on who accepted
+        requester_id = match_data.get("userId")
+        accepter_id = match_data.get("accepted_by")
+        
+        # Partner is the accepter (user B)
+        if accepter_id and accepter_id != user_id:
+            partner_id = accepter_id
+        elif requester_id and requester_id != user_id:
+            partner_id = requester_id
+        else:
+            partner_id = None
+        
+        # Fetch partner details if available
+        partner_info = {}
+        if partner_id:
+            partner_doc = db.collection("users").document(partner_id).get()
+            if partner_doc.exists:
+                partner_data = partner_doc.to_dict()
+                partner_info = {
+                    "partner_uid": partner_id,
+                    "partner_name": partner_data.get("full_name", partner_data.get("email", "Partner")),
+                    "partner_email": partner_data.get("email"),
+                    "partner_profile_image": partner_data.get("profile_image_url")
+                }
+                
+                # Fetch partner's FCM token
+                fcm_token = partner_data.get("fcm_token")
+                if fcm_token:
+                    partner_info["partner_fcm_token"] = fcm_token
+        
+        # Return combined match and partner info
+        return {
+            "match_id": match_id,
+            "status": match_data.get("status"),
+            "session_type": match_data.get("session_type"),
+            "message": match_data.get("message"),
+            "accepted_at": match_data.get("accepted_at"),
+            **partner_info
+        }
     
     except HTTPException:
         raise

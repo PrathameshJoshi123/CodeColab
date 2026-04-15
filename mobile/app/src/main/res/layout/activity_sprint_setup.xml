@@ -195,7 +195,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Meeting Link (Optional)"
+                android:text="Meeting Link"
                 android:textColor="@color/text_white"
                 android:layout_marginTop="20dp"
                 android:textStyle="bold" />
@@ -228,53 +228,76 @@
                     android:letterSpacing="0.1"
                     android:textSize="12sp" />
                 <TextView
+                    android:id="@+id/tvTodoCount"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_alignParentRight="true"
-                    android:text="1/3 Completed"
+                    android:text="0/0 Completed"
                     android:textColor="@color/brand_blue"
                     android:textSize="12sp"
                     android:textStyle="bold" />
             </RelativeLayout>
 
-            <LinearLayout
+            <!-- ==================== Todo Items RecyclerView ==================== -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/todosRecyclerView"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:background="@drawable/input_background"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="16dp">
-                <CheckBox
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:buttonTint="@color/brand_blue"
-                    android:checked="true" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Review PR #42 comments"
-                    android:textColor="@color/text_white"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
+                android:nestedScrollingEnabled="false" />
 
-            <LinearLayout
+            <!-- ==================== Add Todo Section ==================== -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ADD TODO"
+                android:textColor="@color/text_white"
+                android:textStyle="bold"
+                android:letterSpacing="0.1"
+                android:textSize="12sp"
+                android:layout_marginTop="24dp" />
+
+            <EditText
+                android:id="@+id/etTodoTitle"
                 android:layout_width="match_parent"
-                android:layout_height="60dp"
+                android:layout_height="56dp"
                 android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp"
                 android:background="@drawable/input_background"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="16dp">
-                <CheckBox
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:buttonTint="@color/text_muted" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Implement error boundary"
-                    android:textColor="@color/text_white"
-                    android:layout_marginStart="8dp" />
-            </LinearLayout>
+                android:drawableStart="@drawable/ic_flag"
+                android:drawablePadding="12dp"
+                android:drawableTint="@color/text_muted"
+                android:hint="Todo title (e.g., Write unit tests)"
+                android:paddingHorizontal="16dp"
+                android:textColor="@color/text_white"
+                android:textColorHint="@color/text_muted"
+                android:inputType="text" />
+
+            <EditText
+                android:id="@+id/etTodoDescription"
+                android:layout_width="match_parent"
+                android:layout_height="80dp"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/input_background"
+                android:gravity="top"
+                android:hint="Description (optional)"
+                android:padding="16dp"
+                android:textColor="@color/text_white"
+                android:textColorHint="@color/text_muted"
+                android:inputType="textMultiLine" />
+
+            <Button
+                android:id="@+id/btnAddTodo"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="+ Add Todo"
+                android:textColor="@color/text_white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:backgroundTint="@color/input_bg"
+                android:textAllCaps="false"
+                app:cornerRadius="12dp"
+                android:layout_marginBottom="12dp" />
 
         </LinearLayout>
     </ScrollView>

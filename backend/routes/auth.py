@@ -245,3 +245,29 @@ async def google_oauth(oauth_data: GoogleOAuthRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Google OAuth failed: {str(e)}"
         )
+
+
+@router.post("/logout")
+async def logout():
+    """
+    Logout user by invalidating their session
+    
+    This endpoint can be called by mobile clients to properly logout.
+    The JWT token will be deleted client-side in the mobile app.
+    
+    In a JWT-based auth system, logout primarily happens client-side.
+    This endpoint serves as a confirmation point where we can:
+    1. Log the logout event
+    2. Clean up any server-side resources if needed
+    """
+    try:
+        return {
+            "success": True,
+            "message": "Logged out successfully"
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Logout failed: {str(e)}"
+        )

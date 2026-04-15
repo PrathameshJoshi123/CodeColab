@@ -39,4 +39,10 @@ public class SprintSessionResponse {
     
     @SerializedName("participants")
     public List<String> participants;
+    
+    @SerializedName("participantDetails")
+    public List<ParticipantDetail> participantDetails;
+    
+    @SerializedName("match_id")
+    public String matchId;
 }

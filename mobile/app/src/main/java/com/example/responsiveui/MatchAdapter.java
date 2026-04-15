@@ -18,13 +18,14 @@ import java.util.List;
  * ==================== MatchAdapter ====================
  * RecyclerView adapter for displaying match cards
  * Shows user profiles with skills, reputation, and created date
- * Only displays accept action (for browsing other user's matches)
+ * Mode: "browse" = shows accept button, "received" = no action buttons
  */
 public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHolder> {
     
     private final List<MatchRequestResponse> matches;
     private final Context context;
     private MatchActionListener listener;
+    private String mode = "browse";  // "browse" or "received"
 
     public interface MatchActionListener {
         void onAccept(MatchRequestResponse match);
@@ -33,6 +34,12 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
     public MatchAdapter(List<MatchRequestResponse> matches, Context context) {
         this.matches = matches;
         this.context = context;
+    }
+
+    public MatchAdapter(List<MatchRequestResponse> matches, Context context, String mode) {
+        this.matches = matches;
+        this.context = context;
+        this.mode = mode;
     }
 
     public void setListener(MatchActionListener listener) {
@@ -50,7 +57,7 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
     @Override
     public void onBindViewHolder(@NonNull MatchViewHolder holder, int position) {
         MatchRequestResponse match = matches.get(position);
-        holder.bind(match, listener);
+        holder.bind(match, listener, mode);
     }
 
     @Override
@@ -99,7 +106,7 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
             btnReject = itemView.findViewById(R.id.btnReject);
         }
 
-        public void bind(MatchRequestResponse match, MatchActionListener listener) {
+        public void bind(MatchRequestResponse match, MatchActionListener listener, String mode) {
             // User Details
             MatchRequestResponse.UserMatchProfile user = match.user;
             if (user != null) {
@@ -175,15 +182,22 @@ public class MatchAdapter extends RecyclerView.Adapter<MatchAdapter.MatchViewHol
             }
 
             // ==================== Action Buttons ====================
-            // Only show Accept button (Hide Reject button in browse view)
-            btnAccept.setVisibility(View.VISIBLE);
-            btnReject.setVisibility(View.GONE);
-            
-            btnAccept.setOnClickListener(v -> {
-                if (listener != null) {
-                    listener.onAccept(match);
-                }
-            });
+            // Show/hide based on mode
+            if ("received".equals(mode)) {
+                // Received tab - no action buttons
+                btnAccept.setVisibility(View.GONE);
+                btnReject.setVisibility(View.GONE);
+            } else {
+                // Browse tab - show accept button only
+                btnAccept.setVisibility(View.VISIBLE);
+                btnReject.setVisibility(View.GONE);
+                
+                btnAccept.setOnClickListener(v -> {
+                    if (listener != null) {
+                        listener.onAccept(match);
+                    }
+                });
+            }
         }
 
         // ==================== Date Formatting ====================

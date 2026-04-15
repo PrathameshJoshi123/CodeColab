@@ -22,6 +22,8 @@ class Matching(Base):
     reason = Column(String(500), nullable=True)
     is_accepted = Column(String(255), default=False)
     accepted_at = Column(DateTime, nullable=True)
+    sprint_setup_status = Column(String(50), default="pending")  # pending, in_progress, completed
+    sprint_setup_completed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

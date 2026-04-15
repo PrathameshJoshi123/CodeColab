@@ -25,6 +25,9 @@ public class SprintSessionCreateRequest {
     @SerializedName("participants")
     public List<String> participants;
     
+    @SerializedName("match_id")
+    public String matchId;
+    
     public SprintSessionCreateRequest(String goalTitle, String description, 
                                    String repoLink, String meetingLink, 
                                    int durationMinutes, List<String> participants) {
@@ -34,5 +37,19 @@ public class SprintSessionCreateRequest {
         this.meetingLink = meetingLink;
         this.durationMinutes = durationMinutes;
         this.participants = participants;
+        this.matchId = null;
+    }
+    
+    public SprintSessionCreateRequest(String goalTitle, String description, 
+                                   String repoLink, String meetingLink, 
+                                   int durationMinutes, List<String> participants,
+                                   String matchId) {
+        this.goalTitle = goalTitle;
+        this.description = description;
+        this.repoLink = repoLink;
+        this.meetingLink = meetingLink;
+        this.durationMinutes = durationMinutes;
+        this.participants = participants;
+        this.matchId = matchId;
     }
 }

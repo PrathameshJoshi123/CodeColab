@@ -3,6 +3,7 @@ import firebase_admin
 from firebase_admin import messaging
 from firebase_init import get_db
 from google.cloud.firestore_v1 import FieldFilter
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -170,3 +171,119 @@ def send_match_accepted_notification(requester_id: str, accepter_name: str, matc
 def send_match_rejected_notification(requester_id: str, rejecter_name: str, match_id: str):
     """Convenience function to send match rejection notification"""
     return FCMService.send_match_rejection_notification(requester_id, rejecter_name, match_id)
+
+
+def send_sprint_confirmation_notification(partner_id: str, confirmer_name: str, sprint_id: str, goal_title: str):
+    """
+    Send notification when sprint is confirmed by partner
+    
+    Args:
+        partner_id: UID of user who will receive notification
+        confirmer_name: Full name of user who confirmed the sprint
+        sprint_id: ID of the sprint session
+        goal_title: Title/goal of the sprint
+    """
+    try:
+        # Get partner's FCM token
+        db = get_db()
+        user_doc = db.collection("users").document(partner_id).get()
+        
+        if not user_doc.exists:
+            logger.warning(f"Partner {partner_id} not found in database")
+            return False
+        
+        # Get FCM token from user document
+        user_data = user_doc.to_dict()
+        fcm_token = user_data.get("fcm_token")
+        
+        if not fcm_token:
+            logger.warning(f"FCM token not found for partner {partner_id}")
+            return False
+        
+        logger.info(f"Sending sprint confirmation notification to partner {partner_id}...")
+        
+        # Prepare notification message
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title="Sprint Confirmed! ✅",
+                body=f"{confirmer_name} confirmed sprint: {goal_title}"
+            ),
+            data={
+                "sprint_id": sprint_id,
+                "type": "SPRINT_CONFIRMED",
+                "confirmer_name": confirmer_name,
+                "goal_title": goal_title
+            },
+            token=fcm_token
+        )
+        
+        # Send the message
+        response = messaging.send(message)
+        logger.info(f"✓ Sprint confirmation notification sent: {response}")
+        
+        # Log notification in Firestore
+        FCMService._log_notification(
+            partner_id,
+            "SPRINT_CONFIRMED",
+            f"Sprint confirmed: {goal_title}",
+            sprint_id
+        )
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Failed to send sprint confirmation notification: {str(e)}", exc_info=True)
+        return False
+
+
+def send_chat_message_notification(partner_id: str, sender_name: str, message_content: str, sprint_id: str):
+    """
+    Send real-time data message notification for new chat messages
+    Uses FCM data message (not notification) for instant in-app updates
+    
+    Args:
+        partner_id: UID of user who will receive notification
+        sender_name: Full name of user sending the message
+        message_content: Content of the chat message
+        sprint_id: ID of the sprint session
+    """
+    try:
+        # Get partner's FCM token
+        db = get_db()
+        user_doc = db.collection("users").document(partner_id).get()
+        
+        if not user_doc.exists:
+            logger.warning(f"Partner {partner_id} not found in database")
+            return False
+        
+        # Get FCM token from user document
+        user_data = user_doc.to_dict()
+        fcm_token = user_data.get("fcm_token")
+        
+        if not fcm_token:
+            logger.warning(f"FCM token not found for partner {partner_id}")
+            return False
+        
+        logger.info(f"Sending chat message to partner {partner_id}...")
+        
+        # Prepare data message (no notification UI, just data for app to handle)
+        message = messaging.Message(
+            data={
+                "sprint_id": sprint_id,
+                "type": "CHAT_MESSAGE",
+                "sender_name": sender_name,
+                "content": message_content[:200],  # Truncate to fit in FCM
+                "timestamp": str(datetime.utcnow())
+            },
+            token=fcm_token
+        )
+        
+        # Send the message
+        response = messaging.send(message)
+        logger.info(f"✓ Chat message sent via FCM: {response}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"✗ Failed to send chat message: {str(e)}", exc_info=True)
+        return False

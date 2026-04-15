@@ -10,7 +10,7 @@ from config import settings
 from firebase_init import init_firebase
 
 # Import route modules
-from routes import users, skills, sprints, matches, auth
+from routes import users, skills, sprints, matches, auth, chat
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -69,6 +69,7 @@ app.include_router(users.router)
 app.include_router(skills.router)
 app.include_router(sprints.router)
 app.include_router(matches.router)
+app.include_router(chat.router)
 
 # ==================== Error Handlers ====================
 

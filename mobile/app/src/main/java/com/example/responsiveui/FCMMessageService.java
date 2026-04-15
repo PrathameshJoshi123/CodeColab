@@ -40,8 +40,15 @@ public class FCMMessageService extends FirebaseMessagingService {
         }
 
         if (!remoteMessage.getData().isEmpty()) {
-            // Data message received
-            Log.d(TAG, "Data Payload: " + remoteMessage.getData());
+            // Data message received (used for chat messages)
+            String messageType = remoteMessage.getData().get("type");
+            if ("CHAT_MESSAGE".equals(messageType)) {
+                // Handle chat message update - Firestore listener will handle the display
+                // Just refresh the chat if app is in foreground
+                Log.d(TAG, "Chat message received: " + remoteMessage.getData());
+            } else {
+                Log.d(TAG, "Data Payload: " + remoteMessage.getData());
+            }
         }
     }
 
@@ -52,9 +59,11 @@ public class FCMMessageService extends FirebaseMessagingService {
         // Get notification data
         String notificationType = data.get("type");
         String matchId = data.get("match_id");
-        String accepterId = data.get("accepter_id");
+        String accepterName = data.get("accepter_name");
+        String confirmerName = data.get("confirmer_name");
+        String sprintId = data.get("sprint_id");
         
-        Log.d(TAG, "Notification Type: " + notificationType + ", Match ID: " + matchId);
+        Log.d(TAG, "Notification Type: " + notificationType + ", Match ID: " + matchId + ", Sprint ID: " + sprintId);
 
         // Create notification channel (required for Android 8.0+)
         createNotificationChannel();
@@ -67,7 +76,11 @@ public class FCMMessageService extends FirebaseMessagingService {
         if ("MATCH_ACCEPTED".equals(notificationType)) {
             intent.putExtra("OPEN_SPRINT_SETUP", true);
             intent.putExtra("MATCH_ID", matchId);
-            intent.putExtra("PARTNER_NAME", accepterId);
+            intent.putExtra("PARTNER_NAME", accepterName != null ? accepterName : "Partner");
+        } else if ("SPRINT_CONFIRMED".equals(notificationType)) {
+            intent.putExtra("OPEN_SPRINT_DETAILS", true);
+            intent.putExtra("SPRINT_ID", sprintId);
+            intent.putExtra("PARTNER_NAME", confirmerName != null ? confirmerName : "Partner");
         }
         
         PendingIntent pendingIntent = PendingIntent.getActivity(
