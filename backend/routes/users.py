@@ -175,7 +175,7 @@ async def get_user(user_id: str):
 # ==================== Profile Management ====================
 
 @router.get("/me/profile", response_model=Profile)
-async def get_current_user_profile(credentials = Depends(security)):
+async def get_profile(credentials = Depends(security)):
     """Get current authenticated user's profile"""
     try:
         user_id = await get_current_user(credentials)
