@@ -1,29 +1,32 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
+from typing import Optional
 
 # ==================== User Models ====================
 
 class UserCreate(BaseModel):
-    """User registration data"""
+    """User data for registration"""
+    uid: str
     email: str
-    uid: str  # Firebase UID
     oauth_provider: str
 
+
 class UserLogin(BaseModel):
-    """Firebase email/password login data"""
+    """User login credentials"""
     email: str
     password: str
 
+
 class UserLoginResponse(BaseModel):
-    """Firebase login response payload"""
-    idToken: str
-    refreshToken: str
-    expiresIn: str
-    localId: str
+    """Response after user login"""
+    user_id: str
     email: str
+    access_token: str
+    token_type: str
+
 
 class User(BaseModel):
-    """User response model"""
+    """User model"""
     uid: str
     email: str
     oauth_provider: str
@@ -32,31 +35,37 @@ class User(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    class Config:
+        from_attributes = True
+
+
 # ==================== Profile Models ====================
 
 class ProfileUpdate(BaseModel):
     """Profile update data"""
-    full_name: str | None = None
-    bio: str | None = None
-    college: str | None = None
-    city: str | None = None
-    github_username: str | None = None
-    linkedin_url: str | None = None
-    profile_image_url: str | None = None
-    is_available: bool | None = None
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    expertise_areas: Optional[list[str]] = None
+    location: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    website_url: Optional[str] = None
+
 
 class Profile(BaseModel):
-    """User profile response"""
-    userId: str
-    full_name: str
-    bio: str
-    college: str
-    city: str
-    github_username: str
-    linkedin_url: str
-    profile_image_url: str
-    karma_score: int
-    xp_points: int
-    level: int
-    streak_count: int
-    is_available: bool
+    """User profile model"""
+    user_id: str
+    full_name: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
+    expertise_areas: Optional[list[str]] = None
+    location: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    website_url: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True

@@ -47,8 +47,6 @@ public class ChatFragment extends Fragment {
     private ProgressBar loadingProgress;
 
     private final List<ChatSessionItem> allChatSessions = new ArrayList<>();
-    private boolean hasCreatedLoadFailure = false;
-    private boolean hasInvitedLoadFailure = false;
     private boolean hasChatLoadFailure = false;
 
     @Nullable
@@ -85,17 +83,11 @@ public class ChatFragment extends Fragment {
             loadingProgress.setVisibility(View.VISIBLE);
         }
 
-        hasCreatedLoadFailure = false;
-        hasInvitedLoadFailure = false;
         hasChatLoadFailure = false;
         allChatSessions.clear();
         hideEmptyState();
 
-        loadCreatedChatSessions();
-    }
-
-    private void loadCreatedChatSessions() {
-        apiService.getCreatedSprints().enqueue(new Callback<List<SprintSessionResponse>>() {
+        apiService.getUserSprints().enqueue(new Callback<List<SprintSessionResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Response<List<SprintSessionResponse>> response) {
                 if (!isAdded()) {
@@ -104,11 +96,10 @@ public class ChatFragment extends Fragment {
 
                 if (response.isSuccessful()) {
                     addChatSessions(response.body());
+                    finishChatLoad(false, null);
                 } else {
-                    hasCreatedLoadFailure = true;
+                    finishChatLoad(true, null);
                 }
-
-                loadInvitedChatSessions();
             }
 
             @Override
@@ -117,42 +108,12 @@ public class ChatFragment extends Fragment {
                     return;
                 }
 
-                hasCreatedLoadFailure = true;
-                loadInvitedChatSessions();
+                finishChatLoad(true, t);
             }
         });
     }
 
-    private void loadInvitedChatSessions() {
-        apiService.getInvitedSprints().enqueue(new Callback<List<SprintSessionResponse>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Response<List<SprintSessionResponse>> response) {
-                if (!isAdded()) {
-                    return;
-                }
-
-                if (response.isSuccessful()) {
-                    addChatSessions(response.body());
-                } else {
-                    hasInvitedLoadFailure = true;
-                }
-
-                finishChatLoad(null);
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Throwable t) {
-                if (!isAdded()) {
-                    return;
-                }
-
-                hasInvitedLoadFailure = true;
-                finishChatLoad(t);
-            }
-        });
-    }
-
-    private void finishChatLoad(@Nullable Throwable error) {
+    private void finishChatLoad(boolean hasLoadError, @Nullable Throwable error) {
         if (loadingProgress != null) {
             loadingProgress.setVisibility(View.GONE);
         }
@@ -162,7 +123,7 @@ public class ChatFragment extends Fragment {
                 .thenComparing(item -> item.partnerName.toLowerCase())
         );
 
-        hasChatLoadFailure = allChatSessions.isEmpty() && hasCreatedLoadFailure && hasInvitedLoadFailure;
+        hasChatLoadFailure = hasLoadError && allChatSessions.isEmpty();
         if (hasChatLoadFailure) {
             showEmptyState("Unable to load chats");
             if (error != null) {
