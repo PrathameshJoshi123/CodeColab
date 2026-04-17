@@ -5,82 +5,106 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="12dp"
-    app:cardBackgroundColor="@color/input_bg"
-    app:cardCornerRadius="16dp"
-    app:cardElevation="4dp">
+    app:cardBackgroundColor="@color/md_theme_light_surface_variant"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:padding="12dp">
 
-        <!-- ==================== Header: Session Type + Status ==================== -->
+        <!-- ==================== Header: My Request Badge + Status ==================== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
+            android:layout_marginBottom="10dp">
 
             <TextView
-                android:id="@+id/sessionTypeText"
-                android:layout_width="0dp"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Debug"
-                android:textColor="@color/text_white"
-                android:textSize="16sp"
-                android:textStyle="bold" />
+                android:text="📌 My Request"
+                android:textColor="@color/md_theme_light_on_surface_variant"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/statusBadge"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
+                android:layout_height="24dp"
                 android:text="Pending"
                 android:textColor="@color/text_white"
-                android:paddingHorizontal="12dp"
+                android:paddingHorizontal="10dp"
                 android:gravity="center"
-                android:textSize="11sp"
+                android:textSize="10sp"
                 android:textStyle="bold"
-                android:background="@drawable/bg_status_pending"
-                android:layout_marginStart="8dp" />
+                android:background="@drawable/bg_status_pending" />
 
         </LinearLayout>
 
-        <!-- ==================== Message ==================== -->
-        <TextView
-            android:id="@+id/messageText"
+        <!-- ==================== Session Type + Message ==================== -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Looking for someone to help debug my app"
-            android:textColor="@color/text_muted"
-            android:textSize="13sp"
-            android:layout_marginBottom="12dp"
-            android:maxLines="2"
-            android:ellipsize="end" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
 
-        <!-- ==================== Created At ==================== -->
-        <TextView
-            android:id="@+id/createdAtText"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Created: 2 hours ago"
-            android:textColor="@color/text_muted"
-            android:textSize="11sp"
-            android:layout_marginBottom="12dp" />
+            <TextView
+                android:id="@+id/sessionTypeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Debug"
+                android:textColor="@color/md_theme_light_on_surface"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:layout_marginEnd="8dp" />
 
-        <!-- ==================== Cancel Button ==================== -->
-        <Button
-            android:id="@+id/btnCancel"
+            <TextView
+                android:id="@+id/messageText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Looking for someone to help debug my app"
+                android:textColor="@color/md_theme_light_on_surface_variant"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+        </LinearLayout>
+
+        <!-- ==================== Metadata Row ==================== -->
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:text="Cancel Request"
-            android:textColor="@color/text_white"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:background="@drawable/bg_button_outline"
-            android:visibility="gone" />
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="8dp">
+
+            <TextView
+                android:id="@+id/createdAtText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Created: 2 hours ago"
+                android:textColor="@color/md_theme_light_outline_variant"
+                android:textSize="10sp" />
+
+            <Button
+                android:id="@+id/btnCancel"
+                android:layout_width="wrap_content"
+                android:layout_height="28dp"
+                android:text="Cancel"
+                android:textColor="@color/md_theme_light_error"
+                android:textSize="10sp"
+                android:paddingHorizontal="8dp"
+                android:background="@android:color/transparent"
+                android:visibility="gone" />
+
+        </LinearLayout>
 
     </LinearLayout>
 

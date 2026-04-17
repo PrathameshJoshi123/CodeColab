@@ -55,6 +55,12 @@ public interface CodeCollabApiService {
     @GET("/users")
     Call<List<UserResponse>> getAllUsers();
     
+    @GET("/users/search")
+    Call<List<UserSearchResponse>> searchUsers(
+            @Query("query") String query,
+            @Query("limit") int limit
+    );
+    
     // ==================== User Profile ====================
     
     @GET("/users/me/profile")
@@ -196,7 +202,7 @@ public interface CodeCollabApiService {
     @DELETE("/matches/{matchId}")
     Call<Void> cancelMatchRequest(@Path("matchId") String matchId);
     
-    // ==================== Chat ====================
+    // ==================== Chat - Sprint Messages ====================
     
     @POST("/chat/conversations/{sprintId}/messages")
     Call<Map<String, Object>> sendMessage(
@@ -212,6 +218,26 @@ public interface CodeCollabApiService {
     
     @DELETE("/chat/messages/{messageId}")
     Call<Map<String, Object>> deleteMessage(@Path("messageId") String messageId);
+    
+    // ==================== Chat - Direct Messages ====================
+    
+    @POST("/chat/dm/create")
+    Call<Map<String, Object>> createOrGetConversation(@Body Map<String, String> recipientData);
+    
+    @POST("/chat/dm/{conversationId}/send")
+    Call<Map<String, Object>> sendDirectMessage(
+            @Path("conversationId") String conversationId,
+            @Body Map<String, Object> messageData
+    );
+    
+    @GET("/chat/dm/{conversationId}/messages")
+    Call<List<Map<String, Object>>> getConversationHistory(
+            @Path("conversationId") String conversationId,
+            @Query("limit") int limit
+    );
+    
+    @GET("/chat/dm/conversations")
+    Call<List<Map<String, Object>>> getMyConversations();
     
     // ==================== Scratchpad ====================
     

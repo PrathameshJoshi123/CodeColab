@@ -1,7 +1,140 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
+    <!-- ==================== BASE APPLICATION DARK THEME ==================== -->
     <style name="Base.Theme.ResponsiveUI" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <!-- Primary Colors -->
+        <item name="colorPrimary">@color/md_theme_dark_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_dark_on_primary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_dark_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_dark_on_primary_container</item>
+        
+        <!-- Secondary Colors -->
+        <item name="colorSecondary">@color/md_theme_dark_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_dark_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md_theme_dark_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md_theme_dark_on_secondary_container</item>
+        
+        <!-- Tertiary Colors -->
+        <item name="colorTertiary">@color/md_theme_dark_tertiary</item>
+        <item name="colorOnTertiary">@color/md_theme_dark_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md_theme_dark_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md_theme_dark_on_tertiary_container</item>
+        
+        <!-- Background & Surface -->
+        <item name="android:colorBackground">@color/md_theme_dark_background</item>
+        <item name="colorOnBackground">@color/md_theme_dark_on_background</item>
+        <item name="colorSurface">@color/md_theme_dark_surface</item>
+        <item name="colorOnSurface">@color/md_theme_dark_on_surface</item>
+        <item name="colorSurfaceVariant">@color/md_theme_dark_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/md_theme_dark_on_surface_variant</item>
+        
+        <!-- Error Colors -->
+        <item name="colorError">@color/md_theme_dark_error</item>
+        <item name="colorOnError">@color/md_theme_dark_on_error</item>
+        <item name="colorErrorContainer">@color/md_theme_dark_error_container</item>
+        <item name="colorOnErrorContainer">@color/md_theme_dark_on_error_container</item>
+        
+        <!-- Outline -->
+        <item name="colorOutline">@color/md_theme_dark_outline</item>
+        <item name="colorOutlineVariant">@color/md_theme_dark_outline_variant</item>
+
+        <!-- Custom Theme Attributes (for ?attr/ references in layouts) -->
+        <item name="colorBackground">@color/md_theme_dark_background</item>
+        <item name="colorOnBackground">@color/md_theme_dark_on_background</item>
+        <item name="colorSurface">@color/md_theme_dark_surface</item>
+        <item name="colorOnSurface">@color/md_theme_dark_on_surface</item>
+        <item name="colorSurfaceVariant">@color/md_theme_dark_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/md_theme_dark_on_surface_variant</item>
+        <item name="colorPrimary">@color/md_theme_dark_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_dark_on_primary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_dark_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_dark_on_primary_container</item>
+        <item name="colorSecondary">@color/md_theme_dark_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_dark_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/md_theme_dark_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/md_theme_dark_on_secondary_container</item>
+        <item name="colorTertiary">@color/md_theme_dark_tertiary</item>
+        <item name="colorOnTertiary">@color/md_theme_dark_on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/md_theme_dark_tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/md_theme_dark_on_tertiary_container</item>
+        <item name="colorError">@color/md_theme_dark_error</item>
+        <item name="colorOnError">@color/md_theme_dark_on_error</item>
+        <item name="colorErrorContainer">@color/md_theme_dark_error_container</item>
+        <item name="colorOnErrorContainer">@color/md_theme_dark_on_error_container</item>
+        <item name="colorOutline">@color/md_theme_dark_outline</item>
+        <item name="colorOutlineVariant">@color/md_theme_dark_outline_variant</item>
+    </style>
+
+    <style name="Theme.ResponsiveUI" parent="Base.Theme.ResponsiveUI" />
+
+    <!-- ==================== BASE TEXT APPEARANCE (DARK) ==================== -->
+    <style name="TextAppearance">
+        <item name="android:textColor">@color/md_theme_dark_on_surface</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- ==================== TEXT STYLES (DARK) ==================== -->
+    <style name="TextAppearance.Title">
+        <item name="android:textColor">@color/md_theme_dark_on_background</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Heading">
+        <item name="android:textColor">@color/md_theme_dark_on_background</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Subtitle">
+        <item name="android:textColor">@color/md_theme_dark_on_surface_variant</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="TextAppearance.Body">
+        <item name="android:textColor">@color/md_theme_dark_on_surface</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <!-- ==================== BUTTON STYLES (DARK) ==================== -->
+    <style name="PrimaryButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/md_theme_dark_on_primary</item>
+        <item name="backgroundTint">@color/md_theme_dark_primary</item>
+        <item name="android:paddingVertical">14dp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="SecondaryButton" parent="Widget.Material3.Button.TextButton">
+        <item name="android:textColor">@color/md_theme_dark_primary</item>
+        <item name="android:paddingVertical">14dp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- ==================== CARD STYLES (DARK) ==================== -->
+    <style name="CardStyle">
+        <item name="android:background">@drawable/card_background</item>
+        <item name="android:elevation">4dp</item>
+    </style>
+
+    <!-- ==================== INPUT FIELD STYLES (DARK) ==================== -->
+    <style name="InputFieldStyle">
+        <item name="android:textColor">@color/md_theme_dark_on_surface</item>
+        <item name="android:textColorHint">@color/md_theme_dark_on_surface_variant</item>
+        <item name="android:background">@drawable/input_background</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+    </style>
+
+    <!-- ==================== BOTTOM SHEET THEME (DARK) ==================== -->
+    <style name="BottomSheetStyle" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowBackground">@color/md_theme_dark_surface</item>
+        <item name="android:colorBackground">@color/md_theme_dark_surface</item>
+        <item name="colorPrimary">@color/md_theme_dark_primary</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
+    <!-- ==================== CHIP STYLES (DARK) ==================== -->
+    <style name="ChipStyle">
+        <item name="android:textColor">@color/md_theme_dark_on_surface</item>
+        <item name="android:background">@drawable/chip_background</item>
     </style>
 </resources>

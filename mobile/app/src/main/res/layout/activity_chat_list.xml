@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark"
+    android:background="?attr/colorBackground"
     android:fitsSystemWindows="true">
 
     <RelativeLayout
@@ -18,7 +18,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Messages"
-            android:textColor="@color/text_white"
+            android:textColor="?attr/colorOnBackground"
             android:textSize="28sp"
             android:textStyle="bold" />
 
@@ -29,7 +29,7 @@
             android:background="@drawable/input_background"
             android:padding="10dp"
             android:src="@android:drawable/ic_menu_edit"
-            app:tint="@color/brand_blue" />
+            app:tint="?attr/colorPrimary" />
     </RelativeLayout>
 
     <EditText

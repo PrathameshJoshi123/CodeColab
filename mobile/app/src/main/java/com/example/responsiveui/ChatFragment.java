@@ -24,10 +24,13 @@ import com.example.responsiveui.api.CodeCollabApiService;
 import com.example.responsiveui.api.TokenManager;
 import com.example.responsiveui.api.models.ParticipantDetail;
 import com.example.responsiveui.api.models.SprintSessionResponse;
+import com.example.responsiveui.api.models.UserSearchResponse;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -47,7 +50,9 @@ public class ChatFragment extends Fragment {
     private ProgressBar loadingProgress;
 
     private final List<ChatSessionItem> allChatSessions = new ArrayList<>();
+    private final List<UserSearchResponse> searchResults = new ArrayList<>();
     private boolean hasChatLoadFailure = false;
+    private boolean isSearchMode = false;
 
     @Nullable
     @Override
@@ -132,7 +137,25 @@ public class ChatFragment extends Fragment {
             return;
         }
 
-        applySearchFilter();
+        // Display chat sessions
+        displayChatSessions();
+    }
+
+    private void displayChatSessions() {
+        if (chatsContainer == null) {
+            return;
+        }
+
+        chatsContainer.removeAllViews();
+
+        if (allChatSessions.isEmpty()) {
+            showEmptyState("No chats available");
+        } else {
+            hideEmptyState();
+            for (ChatSessionItem item : allChatSessions) {
+                chatsContainer.addView(createChatRow(item));
+            }
+        }
     }
 
     private void addChatSessions(@Nullable List<SprintSessionResponse> sessions) {
@@ -176,7 +199,14 @@ public class ChatFragment extends Fragment {
 
             @Override
             public void afterTextChanged(Editable s) {
-                applySearchFilter();
+                String query = s.toString().trim();
+                if (query.length() > 0) {
+                    performUserSearch(query);
+                } else {
+                    // Show existing chat sessions when search is empty
+                    isSearchMode = false;
+                    applySearchFilter("");
+                }
             }
         });
     }
@@ -190,7 +220,252 @@ public class ChatFragment extends Fragment {
             if (etSearchChat != null) {
                 etSearchChat.setText("");
             }
+            isSearchMode = false;
             loadChatSessions();
+        });
+    }
+
+    private void performUserSearch(String query) {
+        if (loadingProgress != null) {
+            loadingProgress.setVisibility(View.VISIBLE);
+        }
+
+        apiService.searchUsers(query, 20).enqueue(new Callback<List<UserSearchResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<UserSearchResponse>> call, @NonNull Response<List<UserSearchResponse>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+
+                android.util.Log.d("CHAT_SEARCH", "Search response code: " + response.code());
+                
+                if (response.isSuccessful()) {
+                    searchResults.clear();
+                    List<UserSearchResponse> results = response.body();
+                    if (results != null) {
+                        android.util.Log.d("CHAT_SEARCH", "Received " + results.size() + " results");
+                        for (UserSearchResponse user : results) {
+                            android.util.Log.d("CHAT_SEARCH", "Result: " + user.fullName + " (" + user.email + ")");
+                        }
+                        searchResults.addAll(results);
+                    } else {
+                        android.util.Log.d("CHAT_SEARCH", "Response body is null");
+                    }
+                    isSearchMode = true;
+                    displaySearchResults();
+                } else {
+                    android.util.Log.d("CHAT_SEARCH", "Search failed with code: " + response.code());
+                    try {
+                        String errorBody = response.errorBody() != null ? response.errorBody().string() : "No error body";
+                        android.util.Log.e("CHAT_SEARCH", "Error response: " + errorBody);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    Toast.makeText(requireContext(), "Search failed: " + response.code(), Toast.LENGTH_SHORT).show();
+                    isSearchMode = false;
+                    applySearchFilter("");
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<UserSearchResponse>> call, @NonNull Throwable t) {
+                if (!isAdded()) {
+                    return;
+                }
+
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+
+                android.util.Log.e("CHAT_SEARCH", "Network error: " + t.getMessage(), t);
+                Toast.makeText(requireContext(), "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                isSearchMode = false;
+                applySearchFilter("");
+            }
+        });
+    }
+
+    private void displaySearchResults() {
+        if (chatsContainer == null) {
+            return;
+        }
+
+        chatsContainer.removeAllViews();
+
+        if (searchResults.isEmpty()) {
+            showEmptyState("No users found");
+            return;
+        }
+
+        hideEmptyState();
+
+        for (UserSearchResponse user : searchResults) {
+            chatsContainer.addView(createUserSearchRow(user));
+        }
+    }
+
+    private View createUserSearchRow(UserSearchResponse user) {
+        LinearLayout row = new LinearLayout(requireContext());
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        row.setPadding(0, 12, 0, 12);
+
+        // Avatar
+        ImageView avatar = new ImageView(requireContext());
+        LinearLayout.LayoutParams avatarParams = new LinearLayout.LayoutParams(dpToPx(50), dpToPx(50));
+        avatar.setLayoutParams(avatarParams);
+        avatar.setImageResource(R.drawable.ic_profile);
+        avatar.setColorFilter(getResources().getColor(R.color.text_muted, null));
+        row.addView(avatar);
+
+        // Content
+        LinearLayout content = new LinearLayout(requireContext());
+        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1
+        );
+        contentParams.setMargins(16, 0, 12, 0);
+        content.setLayoutParams(contentParams);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        // Name
+        TextView tvName = new TextView(requireContext());
+        tvName.setText(user.fullName != null && !user.fullName.isEmpty() ? user.fullName : user.email);
+        tvName.setTextColor(getResources().getColor(R.color.text_white, null));
+        tvName.setTextSize(16);
+        tvName.setTypeface(null, android.graphics.Typeface.BOLD);
+        content.addView(tvName);
+
+        // Level and Karma
+        LinearLayout infoRow = new LinearLayout(requireContext());
+        infoRow.setLayoutParams(new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ));
+        infoRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams infoMargin = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        infoMargin.setMargins(0, 4, 0, 0);
+
+        TextView tvLevel = new TextView(requireContext());
+        tvLevel.setText("Level " + user.level);
+        tvLevel.setTextColor(getResources().getColor(R.color.brand_blue, null));
+        tvLevel.setTextSize(12);
+        infoRow.addView(tvLevel);
+
+        TextView tvKarma = new TextView(requireContext());
+        tvKarma.setText(" • " + user.karmaScore + " pts");
+        tvKarma.setTextColor(getResources().getColor(R.color.text_muted, null));
+        tvKarma.setTextSize(12);
+        LinearLayout.LayoutParams karmaParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        infoRow.addView(tvKarma, karmaParams);
+
+        content.addView(infoRow);
+
+        row.addView(content);
+
+        // Action Button
+        Button btnChat = new Button(requireContext());
+        LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        );
+        btnParams.setMargins(12, 0, 0, 0);
+        btnChat.setLayoutParams(btnParams);
+        btnChat.setText("Chat");
+        btnChat.setTextSize(12);
+        btnChat.setTextColor(getResources().getColor(R.color.text_white, null));
+        btnChat.setBackgroundColor(getResources().getColor(R.color.brand_blue, null));
+        
+        UserSearchResponse userCopy = user;
+        btnChat.setOnClickListener(v -> {
+            // Start a direct message conversation with this user
+            startDirectMessage(userCopy);
+        });
+
+        row.addView(btnChat);
+
+        return row;
+    }
+
+    /**
+     * Start a direct message conversation with the selected user
+     */
+    private void startDirectMessage(UserSearchResponse user) {
+        if (user == null || user.userId == null) {
+            Toast.makeText(requireContext(), "Invalid user", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // Show loading indicator
+        if (loadingProgress != null) {
+            loadingProgress.setVisibility(View.VISIBLE);
+        }
+
+        // Call API to create or get existing conversation
+        Map<String, String> recipientData = new HashMap<>();
+        recipientData.put("user_id", user.userId);
+
+        apiService.createOrGetConversation(recipientData).enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(@NonNull Call<Map<String, Object>> call, @NonNull Response<Map<String, Object>> response) {
+                if (!isAdded()) {
+                    return;
+                }
+
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+
+                if (response.isSuccessful() && response.body() != null) {
+                    Map<String, Object> result = response.body();
+                    String conversationId = (String) result.get("id");
+                    
+                    android.util.Log.d("START_CHAT", "Conversation ID: " + conversationId);
+                    
+                    if (conversationId != null && !conversationId.isEmpty()) {
+                        // Navigate to chat detail activity
+                        Intent intent = new Intent(requireContext(), ChatDetailActivity.class);
+                        intent.putExtra("CONVERSATION_ID", conversationId);
+                        intent.putExtra("PARTNER_NAME", user.fullName != null && !user.fullName.isEmpty() ? user.fullName : user.email);
+                        intent.putExtra("PARTNER_ID", user.userId);
+                        startActivity(intent);
+                    } else {
+                        Toast.makeText(requireContext(), "Failed to create conversation", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    android.util.Log.e("START_CHAT", "Error response: " + response.code());
+                    Toast.makeText(requireContext(), "Error creating conversation (Code: " + response.code() + ")", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<Map<String, Object>> call, @NonNull Throwable t) {
+                if (!isAdded()) {
+                    return;
+                }
+
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+
+                android.util.Log.e("START_CHAT", "Network error: " + t.getMessage(), t);
+                Toast.makeText(requireContext(), "Network error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
         });
     }
 
@@ -229,6 +504,43 @@ public class ChatFragment extends Fragment {
             showEmptyState(emptyText);
         } else {
             hideEmptyState();
+        }
+    }
+
+    private void applySearchFilter(String query) {
+        if (chatsContainer == null) {
+            return;
+        }
+
+        chatsContainer.removeAllViews();
+
+        if (query.isEmpty()) {
+            // Show all chat sessions
+            if (allChatSessions.isEmpty()) {
+                showEmptyState("No chats available");
+            } else {
+                hideEmptyState();
+                for (ChatSessionItem item : allChatSessions) {
+                    chatsContainer.addView(createChatRow(item));
+                }
+            }
+        } else {
+            // Filter existing chat sessions
+            int matchCount = 0;
+            for (ChatSessionItem item : allChatSessions) {
+                if (item.partnerName.toLowerCase().contains(query)
+                    || item.statusLabel.toLowerCase().contains(query)
+                    || item.subtitle.toLowerCase().contains(query)) {
+                    chatsContainer.addView(createChatRow(item));
+                    matchCount++;
+                }
+            }
+
+            if (matchCount == 0) {
+                showEmptyState("No chats found");
+            } else {
+                hideEmptyState();
+            }
         }
     }
 

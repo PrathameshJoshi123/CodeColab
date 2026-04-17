@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark">
+    android:background="?attr/colorBackground">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -46,7 +46,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="DevSprint"
-                        android:textColor="#FFFFFF"
+                        android:textColor="?attr/colorOnBackground"
                         android:textSize="24sp"
                         android:textStyle="bold"
                         android:layout_marginTop="8dp"/>
@@ -64,7 +64,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Welcome Back"
-                    android:textColor="#FFFFFF"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="28sp"
                     android:textStyle="bold"
                     android:layout_gravity="center_horizontal"/>
@@ -82,7 +82,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Email Address"
-                    android:textColor="@color/text_white"
+                    android:textColor="?attr/colorOnSurface"
                     android:layout_marginTop="24dp"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -95,11 +95,11 @@
                     android:background="@drawable/input_background"
                     android:drawableStart="@drawable/mail"
                     android:drawablePadding="12dp"
-                    android:drawableTint="@color/text_muted"
+                    android:drawableTint="?attr/colorOnSurfaceVariant"
                     android:hint="name@company.com"
                     android:paddingHorizontal="16dp"
-                    android:textColor="@color/text_white"
-                    android:textColorHint="@color/text_muted"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
                     android:textSize="14sp"
                     android:inputType="textEmailAddress" />
 
@@ -107,7 +107,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="Password"
-                    android:textColor="@color/text_white"
+                    android:textColor="?attr/colorOnSurface"
                     android:layout_marginTop="16dp"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -120,12 +120,12 @@
                     android:background="@drawable/input_background"
                     android:drawableStart="@drawable/ic_lock"
                     android:drawablePadding="12dp"
-                    android:drawableTint="@color/text_muted"
+                    android:drawableTint="?attr/colorOnSurfaceVariant"
                     android:hint="••••••••"
                     android:inputType="textPassword"
                     android:paddingHorizontal="16dp"
-                    android:textColor="@color/text_white"
-                    android:textColorHint="@color/text_muted"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textColorHint="?attr/colorOnSurfaceVariant"
                     android:textSize="14sp" />
 
                 <TextView
@@ -135,7 +135,7 @@
                     android:layout_gravity="end"
                     android:layout_marginTop="8dp"
                     android:text="Forgot password?"
-                    android:textColor="@color/brand_blue"
+                    android:textColor="?attr/colorPrimary"
                     android:textSize="14sp"
                     android:background="?attr/selectableItemBackground"
                     android:padding="4dp"
@@ -147,7 +147,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="56dp"
                     android:layout_marginTop="24dp"
-                    android:backgroundTint="@color/brand_blue"
+                    android:backgroundTint="?attr/colorPrimary"
                     android:text="Login to Account"
                     android:textAllCaps="false"
                     android:textColor="@color/text_white"
