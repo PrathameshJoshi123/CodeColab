@@ -22,12 +22,9 @@ import androidx.fragment.app.Fragment;
 import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
 import com.example.responsiveui.api.TokenManager;
-import com.example.responsiveui.api.models.ParticipantDetail;
-import com.example.responsiveui.api.models.SprintSessionResponse;
 import com.example.responsiveui.api.models.UserSearchResponse;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -92,9 +89,9 @@ public class ChatFragment extends Fragment {
         allChatSessions.clear();
         hideEmptyState();
 
-        apiService.getUserSprints().enqueue(new Callback<List<SprintSessionResponse>>() {
+        apiService.getMyConversations().enqueue(new Callback<List<Map<String, Object>>>() {
             @Override
-            public void onResponse(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Response<List<SprintSessionResponse>> response) {
+            public void onResponse(@NonNull Call<List<Map<String, Object>>> call, @NonNull Response<List<Map<String, Object>>> response) {
                 if (!isAdded()) {
                     return;
                 }
@@ -108,7 +105,7 @@ public class ChatFragment extends Fragment {
             }
 
             @Override
-            public void onFailure(@NonNull Call<List<SprintSessionResponse>> call, @NonNull Throwable t) {
+            public void onFailure(@NonNull Call<List<Map<String, Object>>> call, @NonNull Throwable t) {
                 if (!isAdded()) {
                     return;
                 }
@@ -122,11 +119,6 @@ public class ChatFragment extends Fragment {
         if (loadingProgress != null) {
             loadingProgress.setVisibility(View.GONE);
         }
-
-        allChatSessions.sort(
-            Comparator.comparing((ChatSessionItem item) -> item.statusPriority)
-                .thenComparing(item -> item.partnerName.toLowerCase())
-        );
 
         hasChatLoadFailure = hasLoadError && allChatSessions.isEmpty();
         if (hasChatLoadFailure) {
@@ -158,23 +150,23 @@ public class ChatFragment extends Fragment {
         }
     }
 
-    private void addChatSessions(@Nullable List<SprintSessionResponse> sessions) {
+    private void addChatSessions(@Nullable List<Map<String, Object>> sessions) {
         if (sessions == null) {
             return;
         }
 
-        for (SprintSessionResponse sprint : sessions) {
-            ChatSessionItem item = createChatSessionItem(sprint);
-            if (item == null || containsChatSession(item.sprintId)) {
+        for (Map<String, Object> conversation : sessions) {
+            ChatSessionItem item = createChatSessionItem(conversation);
+            if (item == null || containsChatSession(item.conversationId)) {
                 continue;
             }
             allChatSessions.add(item);
         }
     }
 
-    private boolean containsChatSession(String sprintId) {
+    private boolean containsChatSession(String conversationId) {
         for (ChatSessionItem existingItem : allChatSessions) {
-            if (existingItem.sprintId.equals(sprintId)) {
+            if (existingItem.conversationId.equals(conversationId)) {
                 return true;
             }
         }
@@ -636,7 +628,8 @@ public class ChatFragment extends Fragment {
 
     private void openChat(ChatSessionItem item) {
         Intent intent = new Intent(requireContext(), ChatDetailActivity.class);
-        intent.putExtra("SPRINT_ID", item.sprintId);
+        intent.putExtra("CONVERSATION_ID", item.conversationId);
+        intent.putExtra("PARTNER_ID", item.partnerId);
         intent.putExtra("PARTNER_NAME", item.partnerName);
         startActivity(intent);
     }
@@ -644,71 +637,66 @@ public class ChatFragment extends Fragment {
     // ==================== Mapping Helpers ====================
 
     @Nullable
-    private ChatSessionItem createChatSessionItem(@Nullable SprintSessionResponse sprint) {
-        if (sprint == null || sprint.id == null || sprint.id.trim().isEmpty()) {
+    private ChatSessionItem createChatSessionItem(@Nullable Map<String, Object> conversation) {
+        if (conversation == null) {
             return null;
         }
 
-        String partnerName = resolvePartnerName(sprint);
-        String status = sprint.status != null ? sprint.status.trim().toLowerCase() : "setupped";
+        String conversationId = readString(conversation.get("id"));
+        if (conversationId.isEmpty()) {
+            return null;
+        }
 
-        String statusLabel;
-        int statusPriority;
-        if ("started".equals(status) || "live".equals(status)) {
-            statusLabel = "Live";
-            statusPriority = 0;
-        } else if ("end".equals(status) || "completed".equals(status)) {
-            statusLabel = "Ended";
-            statusPriority = 2;
-        } else {
-            statusLabel = "Upcoming";
-            statusPriority = 1;
+        String partnerId = "";
+        String partnerName = "Partner";
+        Object partnerObj = conversation.get("partner");
+        if (partnerObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> partnerMap = (Map<String, Object>) partnerObj;
+            partnerId = readString(partnerMap.get("userId"));
+
+            String fullName = readString(partnerMap.get("full_name"));
+            String email = readString(partnerMap.get("email"));
+            if (!fullName.isEmpty()) {
+                partnerName = fullName;
+            } else if (!email.isEmpty()) {
+                partnerName = localNameFromEmail(email);
+            }
+        }
+
+        if (partnerId.isEmpty()) {
+            Object participantsObj = conversation.get("participants");
+            if (participantsObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Object> participants = (List<Object>) participantsObj;
+                for (Object participantObj : participants) {
+                    String participantId = readString(participantObj);
+                    if (participantId.isEmpty()) {
+                        continue;
+                    }
+                    if (currentUserId != null && currentUserId.equals(participantId)) {
+                        continue;
+                    }
+                    partnerId = participantId;
+                    if ("Partner".equals(partnerName)) {
+                        partnerName = participantId;
+                    }
+                    break;
+                }
+            }
         }
 
         String subtitle = "Tap to open chat";
-        if ("Live".equals(statusLabel)) {
-            subtitle = "Sprint in progress";
+        String lastMessage = readString(conversation.get("last_message"));
+        if (!lastMessage.isEmpty()) {
+            subtitle = lastMessage;
         }
 
-        return new ChatSessionItem(sprint.id, partnerName, statusLabel, statusPriority, subtitle);
+        return new ChatSessionItem(conversationId, partnerId, partnerName, "Direct", 0, subtitle);
     }
 
-    private String resolvePartnerName(SprintSessionResponse sprint) {
-        if (sprint.participantDetails != null) {
-            for (ParticipantDetail participant : sprint.participantDetails) {
-                if (participant == null || participant.userId == null) {
-                    continue;
-                }
-
-                if (currentUserId != null && currentUserId.equals(participant.userId)) {
-                    continue;
-                }
-
-                if (participant.fullName != null && !participant.fullName.trim().isEmpty()) {
-                    return participant.fullName.trim();
-                }
-
-                if (participant.email != null && !participant.email.trim().isEmpty()) {
-                    return localNameFromEmail(participant.email.trim());
-                }
-
-                return participant.userId;
-            }
-        }
-
-        if (sprint.participants != null) {
-            for (String participantId : sprint.participants) {
-                if (participantId == null || participantId.isEmpty()) {
-                    continue;
-                }
-                if (currentUserId != null && currentUserId.equals(participantId)) {
-                    continue;
-                }
-                return participantId;
-            }
-        }
-
-        return "Partner";
+    private String readString(@Nullable Object value) {
+        return value == null ? "" : value.toString().trim();
     }
 
     private String localNameFromEmail(String email) {
@@ -727,14 +715,16 @@ public class ChatFragment extends Fragment {
     // ==================== Item Model ====================
 
     private static class ChatSessionItem {
-        final String sprintId;
+        final String conversationId;
+        final String partnerId;
         final String partnerName;
         final String statusLabel;
         final int statusPriority;
         final String subtitle;
 
-        ChatSessionItem(String sprintId, String partnerName, String statusLabel, int statusPriority, String subtitle) {
-            this.sprintId = sprintId;
+        ChatSessionItem(String conversationId, String partnerId, String partnerName, String statusLabel, int statusPriority, String subtitle) {
+            this.conversationId = conversationId;
+            this.partnerId = partnerId;
             this.partnerName = partnerName;
             this.statusLabel = statusLabel;
             this.statusPriority = statusPriority;

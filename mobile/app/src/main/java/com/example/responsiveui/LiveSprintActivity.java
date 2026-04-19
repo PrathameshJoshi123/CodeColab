@@ -21,6 +21,7 @@ import androidx.activity.EdgeToEdge;
 import androidx.appcompat.app.AppCompatActivity;
 import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
+import com.example.responsiveui.api.TokenManager;
 import com.example.responsiveui.api.models.SprintSessionResponse;
 import com.example.responsiveui.api.models.SprintTodoResponse;
 import com.example.responsiveui.api.models.SprintTodoUpdateRequest;
@@ -29,6 +30,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +49,7 @@ public class LiveSprintActivity extends AppCompatActivity {
     
     private String userEmail;
     private String partnerName;
+    private String partnerId;
     private String sessionLength;
     private String sprintId;
     
@@ -86,8 +89,11 @@ public class LiveSprintActivity extends AppCompatActivity {
         // ==================== Intent Data Extraction ====================
         userEmail = getIntent().getStringExtra("USER_EMAIL");
         partnerName = getIntent().getStringExtra("PARTNER_NAME");
+        partnerId = getIntent().getStringExtra("PARTNER_ID");
         sessionLength = getIntent().getStringExtra("SESSION_LENGTH");
         sprintId = getIntent().getStringExtra("SPRINT_ID");
+
+        TokenManager.init(this);
         
         // Initialize API service
         apiService = ApiConfig.getApiService(this);
@@ -676,15 +682,51 @@ public class LiveSprintActivity extends AppCompatActivity {
     }
     
     private void openChat() {
-        if (sprintId == null || sprintId.isEmpty()) {
-            Toast.makeText(this, "Sprint ID not available", Toast.LENGTH_SHORT).show();
+        if (partnerId == null || partnerId.isEmpty()) {
+            Toast.makeText(this, "Partner ID not available", Toast.LENGTH_SHORT).show();
             return;
         }
 
-        Intent chatIntent = new Intent(this, ChatDetailActivity.class);
-        chatIntent.putExtra("SPRINT_ID", sprintId);
-        chatIntent.putExtra("PARTNER_NAME", partnerName != null ? partnerName : "Partner");
-        startActivity(chatIntent);
+        if (loadingProgress != null) {
+            loadingProgress.setVisibility(View.VISIBLE);
+        }
+
+        Map<String, String> recipientData = new HashMap<>();
+        recipientData.put("user_id", partnerId);
+
+        apiService.createOrGetConversation(recipientData).enqueue(new Callback<Map<String, Object>>() {
+            @Override
+            public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+
+                if (response.isSuccessful() && response.body() != null) {
+                    Object conversationIdObj = response.body().get("id");
+                    String conversationId = conversationIdObj != null ? conversationIdObj.toString() : "";
+
+                    if (!conversationId.isEmpty()) {
+                        Intent chatIntent = new Intent(LiveSprintActivity.this, ChatDetailActivity.class);
+                        chatIntent.putExtra("CONVERSATION_ID", conversationId);
+                        chatIntent.putExtra("PARTNER_NAME", partnerName != null ? partnerName : "Partner");
+                        chatIntent.putExtra("PARTNER_ID", partnerId);
+                        startActivity(chatIntent);
+                    } else {
+                        Toast.makeText(LiveSprintActivity.this, "Unable to open chat", Toast.LENGTH_SHORT).show();
+                    }
+                } else {
+                    Toast.makeText(LiveSprintActivity.this, "Unable to open chat", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Map<String, Object>> call, Throwable t) {
+                if (loadingProgress != null) {
+                    loadingProgress.setVisibility(View.GONE);
+                }
+                Toast.makeText(LiveSprintActivity.this, "Error opening chat: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
     
     // ==================== Lifecycle ====================

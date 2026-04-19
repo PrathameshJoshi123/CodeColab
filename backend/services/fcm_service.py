@@ -459,7 +459,13 @@ def send_sprint_confirmation_notification(partner_id: str, confirmer_name: str, 
         return False
 
 
-def send_chat_message_notification(partner_id: str, sender_name: str, message_content: str, sprint_id: str):
+def send_chat_message_notification(
+    partner_id: str,
+    sender_name: str,
+    message_content: str,
+    sprint_id: str = None,
+    conversation_id: str = None
+):
     """
     Send real-time data message notification for new chat messages
     Uses FCM data message (not notification) for instant in-app updates
@@ -468,7 +474,8 @@ def send_chat_message_notification(partner_id: str, sender_name: str, message_co
         partner_id: UID of user who will receive notification
         sender_name: Full name of user sending the message
         message_content: Content of the chat message
-        sprint_id: ID of the sprint session
+        sprint_id: Optional ID of the sprint session
+        conversation_id: Optional ID of direct-message conversation
     """
     try:
         # Get partner's FCM token
@@ -488,16 +495,22 @@ def send_chat_message_notification(partner_id: str, sender_name: str, message_co
             return False
         
         logger.info(f"Sending chat message to partner {partner_id}...")
+
+        data_payload = {
+            "type": "CHAT_MESSAGE",
+            "sender_name": sender_name,
+            "content": message_content[:200],
+            "timestamp": str(datetime.utcnow())
+        }
+
+        if sprint_id:
+            data_payload["sprint_id"] = sprint_id
+        if conversation_id:
+            data_payload["conversation_id"] = conversation_id
         
         # Prepare data message (no notification UI, just data for app to handle)
         message = messaging.Message(
-            data={
-                "sprint_id": sprint_id,
-                "type": "CHAT_MESSAGE",
-                "sender_name": sender_name,
-                "content": message_content[:200],  # Truncate to fit in FCM
-                "timestamp": str(datetime.utcnow())
-            },
+            data=data_payload,
             token=fcm_token
         )
         

@@ -304,6 +304,7 @@ public class SprintDetailsActivity extends AppCompatActivity {
         
         // Get partner name from participantDetails (name instead of just ID)
         String partnerName = null;
+        String partnerId = null;
         
         if (currentSprint.participantDetails != null && currentSprint.participantDetails.size() > 0) {
             // Find partner from participantDetails (not current user)
@@ -317,6 +318,7 @@ public class SprintDetailsActivity extends AppCompatActivity {
                     continue;
                 }
 
+                partnerId = participantId;
                 partnerName = resolveParticipantDisplayName(participant);
                 if (partnerName == null || partnerName.isEmpty()) {
                     partnerName = "Partner";
@@ -332,6 +334,7 @@ public class SprintDetailsActivity extends AppCompatActivity {
                 if (currentUserId != null && currentUserId.equals(participant)) {
                     continue;
                 }
+                partnerId = participant;
                 partnerName = participant;
                 break;
             }
@@ -342,6 +345,7 @@ public class SprintDetailsActivity extends AppCompatActivity {
         }
 
         intent.putExtra("PARTNER_NAME", partnerName);
+        intent.putExtra("PARTNER_ID", partnerId);
         
         startActivity(intent);
         finish();

@@ -56,6 +56,7 @@ public class FCMMessageService extends FirebaseMessagingService {
      * Display chat notification for data-only chat messages.
      */
     private void showChatMessageNotification(java.util.Map<String, String> data) {
+        String conversationId = data.get("conversation_id");
         String sprintId = data.get("sprint_id");
         String senderName = data.get("sender_name");
         String content = data.get("content");
@@ -72,10 +73,22 @@ public class FCMMessageService extends FirebaseMessagingService {
 
         Intent intent = new Intent(this, ChatDetailActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-        intent.putExtra("SPRINT_ID", sprintId);
+        if (conversationId != null && !conversationId.trim().isEmpty()) {
+            intent.putExtra("CONVERSATION_ID", conversationId);
+        } else {
+            intent.putExtra("SPRINT_ID", sprintId);
+        }
         intent.putExtra("PARTNER_NAME", senderName);
 
-        int requestCode = sprintId != null ? sprintId.hashCode() : 0;
+        int requestCode;
+        if (conversationId != null && !conversationId.trim().isEmpty()) {
+            requestCode = conversationId.hashCode();
+        } else if (sprintId != null && !sprintId.trim().isEmpty()) {
+            requestCode = sprintId.hashCode();
+        } else {
+            requestCode = senderName.hashCode();
+        }
+
         PendingIntent pendingIntent = PendingIntent.getActivity(
             this,
             requestCode,
