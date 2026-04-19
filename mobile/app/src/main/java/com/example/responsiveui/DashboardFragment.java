@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -38,9 +39,20 @@ import retrofit2.Response;
 public class DashboardFragment extends Fragment {
 
     private static final int XP_PER_LEVEL = 300;
+    private static final long DASHBOARD_REFRESH_INTERVAL_MS = 20_000L;
+    private static final long DASHBOARD_REQUEST_DEBOUNCE_MS = 800L;
 
     private CodeCollabApiService apiService;
     private String currentUserId;
+    private boolean forceRefreshOnResume = true;
+    private boolean dashboardLoadInProgress = false;
+    private int activeDashboardRequests = 0;
+    private long lastDashboardLoadStartedAtMs = 0L;
+    private long lastDashboardLoadCompletedAtMs = 0L;
+
+    private int myAcceptedCollaborations = 0;
+    private int receivedAcceptedCollaborations = 0;
+    private Map<String, Integer> topCollaboratorCounts = new HashMap<>();
 
     // Header cards
     private TextView tvCollaborationsCount;
@@ -83,13 +95,15 @@ public class DashboardFragment extends Fragment {
 
         bindViews(view);
         setupActions();
-        loadDashboardData();
     }
 
     @Override
     public void onResume() {
         super.onResume();
-        loadDashboardData();
+
+        boolean shouldForceRefresh = forceRefreshOnResume;
+        forceRefreshOnResume = false;
+        loadDashboardData(shouldForceRefresh);
     }
 
     private void bindViews(@NonNull View view) {
@@ -130,6 +144,7 @@ public class DashboardFragment extends Fragment {
                     return;
                 }
 
+                forceRefreshOnResume = true;
                 Intent intent = new Intent(getActivity(), SkillSelectionActivity.class);
                 intent.putExtra("USER_EMAIL", TokenManager.getUserEmail());
                 startActivity(intent);
@@ -137,13 +152,53 @@ public class DashboardFragment extends Fragment {
         }
     }
 
-    private void loadDashboardData() {
+    private void loadDashboardData(boolean forceRefresh) {
         if (apiService == null || !isAdded()) {
             return;
         }
 
+        long nowMs = SystemClock.elapsedRealtime();
+        if (dashboardLoadInProgress) {
+            if (forceRefresh) {
+                forceRefreshOnResume = true;
+            }
+            return;
+        }
+
+        if (!forceRefresh && nowMs - lastDashboardLoadStartedAtMs < DASHBOARD_REQUEST_DEBOUNCE_MS) {
+            return;
+        }
+
+        if (!forceRefresh
+                && lastDashboardLoadCompletedAtMs > 0
+                && nowMs - lastDashboardLoadCompletedAtMs < DASHBOARD_REFRESH_INTERVAL_MS) {
+            return;
+        }
+
+        dashboardLoadInProgress = true;
+        lastDashboardLoadStartedAtMs = nowMs;
+
+        myAcceptedCollaborations = 0;
+        receivedAcceptedCollaborations = 0;
+        topCollaboratorCounts = new HashMap<>();
+
         loadProfileAndSkills();
         loadCollaborationStats();
+    }
+
+    private void beginDashboardRequest() {
+        activeDashboardRequests++;
+    }
+
+    private void finishDashboardRequest() {
+        if (activeDashboardRequests > 0) {
+            activeDashboardRequests--;
+        }
+
+        if (activeDashboardRequests == 0) {
+            dashboardLoadInProgress = false;
+            lastDashboardLoadCompletedAtMs = SystemClock.elapsedRealtime();
+        }
     }
 
     // ==================== Profile & Streak ====================
@@ -160,32 +215,41 @@ public class DashboardFragment extends Fragment {
             renderSkills(new ArrayList<>());
         }
 
+        beginDashboardRequest();
         apiService.getCurrentUserProfile().enqueue(new Callback<UserProfileResponse>() {
             @Override
             public void onResponse(@NonNull Call<UserProfileResponse> call, @NonNull Response<UserProfileResponse> response) {
-                if (!isAdded()) {
-                    return;
-                }
-
-                if (response.isSuccessful() && response.body() != null) {
-                    UserProfileResponse profile = response.body();
-                    renderProfile(profile);
-
-                    currentUserId = normalizeUserId(profile.userId);
-                    if (currentUserId != null && !currentUserId.equals(fallbackSkillsUserId)) {
-                        loadSkills(currentUserId);
+                try {
+                    if (!isAdded()) {
+                        return;
                     }
-                } else {
-                    renderProfileFallback();
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        UserProfileResponse profile = response.body();
+                        renderProfile(profile);
+
+                        currentUserId = normalizeUserId(profile.userId);
+                        if (currentUserId != null && !currentUserId.equals(fallbackSkillsUserId)) {
+                            loadSkills(currentUserId);
+                        }
+                    } else {
+                        renderProfileFallback();
+                    }
+                } finally {
+                    finishDashboardRequest();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<UserProfileResponse> call, @NonNull Throwable t) {
-                if (!isAdded()) {
-                    return;
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
+                    renderProfileFallback();
+                } finally {
+                    finishDashboardRequest();
                 }
-                renderProfileFallback();
             }
         });
     }
@@ -270,26 +334,35 @@ public class DashboardFragment extends Fragment {
     // ==================== Skills ====================
 
     private void loadSkills(String userId) {
+        beginDashboardRequest();
         apiService.getUserSkills(userId).enqueue(new Callback<List<UserSkillResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<UserSkillResponse>> call, @NonNull Response<List<UserSkillResponse>> response) {
-                if (!isAdded()) {
-                    return;
-                }
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
 
-                if (response.isSuccessful() && response.body() != null) {
-                    renderSkills(response.body());
-                } else {
-                    renderSkills(new ArrayList<>());
+                    if (response.isSuccessful() && response.body() != null) {
+                        renderSkills(response.body());
+                    } else {
+                        renderSkills(new ArrayList<>());
+                    }
+                } finally {
+                    finishDashboardRequest();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<List<UserSkillResponse>> call, @NonNull Throwable t) {
-                if (!isAdded()) {
-                    return;
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
+                    renderSkills(new ArrayList<>());
+                } finally {
+                    finishDashboardRequest();
                 }
-                renderSkills(new ArrayList<>());
             }
         });
     }
@@ -372,62 +445,83 @@ public class DashboardFragment extends Fragment {
     // ==================== Collaborations ====================
 
     private void loadCollaborationStats() {
+        beginDashboardRequest();
         apiService.getMyMatchRequests().enqueue(new Callback<List<MatchRequestResponse>>() {
             @Override
             public void onResponse(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Response<List<MatchRequestResponse>> myRequestsResponse) {
-                if (!isAdded()) {
-                    return;
-                }
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
 
-                int myAcceptedCount = countAcceptedMatches(myRequestsResponse.body());
-                loadAcceptedRequests(myAcceptedCount);
+                    myAcceptedCollaborations = countAcceptedMatches(myRequestsResponse.body());
+                    renderCollaborationStats();
+                } finally {
+                    finishDashboardRequest();
+                }
             }
 
             @Override
             public void onFailure(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Throwable t) {
-                if (!isAdded()) {
-                    return;
-                }
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
 
-                loadAcceptedRequests(0);
+                    myAcceptedCollaborations = 0;
+                    renderCollaborationStats();
+                } finally {
+                    finishDashboardRequest();
+                }
+            }
+        });
+
+        beginDashboardRequest();
+        apiService.getReceivedMatchRequests().enqueue(new Callback<List<MatchRequestResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Response<List<MatchRequestResponse>> receivedResponse) {
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
+
+                    List<MatchRequestResponse> receivedMatches = receivedResponse.body() != null
+                            ? receivedResponse.body()
+                            : new ArrayList<>();
+
+                    receivedAcceptedCollaborations = countAcceptedMatches(receivedMatches);
+                    topCollaboratorCounts = buildCollaboratorCountMap(receivedMatches);
+                    renderCollaborationStats();
+                } finally {
+                    finishDashboardRequest();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Throwable t) {
+                try {
+                    if (!isAdded()) {
+                        return;
+                    }
+
+                    receivedAcceptedCollaborations = 0;
+                    topCollaboratorCounts = new HashMap<>();
+                    renderCollaborationStats();
+                } finally {
+                    finishDashboardRequest();
+                }
             }
         });
     }
 
-    private void loadAcceptedRequests(int myAcceptedCount) {
-        apiService.getReceivedMatchRequests().enqueue(new Callback<List<MatchRequestResponse>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Response<List<MatchRequestResponse>> receivedResponse) {
-                if (!isAdded()) {
-                    return;
-                }
+    private void renderCollaborationStats() {
+        int totalCollaborations = myAcceptedCollaborations + receivedAcceptedCollaborations;
 
-                List<MatchRequestResponse> receivedMatches = receivedResponse.body() != null
-                        ? receivedResponse.body()
-                        : new ArrayList<>();
+        if (tvCollaborationsCount != null) {
+            tvCollaborationsCount.setText(String.valueOf(totalCollaborations));
+        }
 
-                int acceptedByMeCount = countAcceptedMatches(receivedMatches);
-                int totalCollaborations = myAcceptedCount + acceptedByMeCount;
-
-                if (tvCollaborationsCount != null) {
-                    tvCollaborationsCount.setText(String.valueOf(totalCollaborations));
-                }
-
-                renderTopCollaborators(buildCollaboratorCountMap(receivedMatches));
-            }
-
-            @Override
-            public void onFailure(@NonNull Call<List<MatchRequestResponse>> call, @NonNull Throwable t) {
-                if (!isAdded()) {
-                    return;
-                }
-
-                if (tvCollaborationsCount != null) {
-                    tvCollaborationsCount.setText(String.valueOf(myAcceptedCount));
-                }
-                renderTopCollaborators(new HashMap<>());
-            }
-        });
+        renderTopCollaborators(topCollaboratorCounts);
     }
 
     private int countAcceptedMatches(List<MatchRequestResponse> matches) {

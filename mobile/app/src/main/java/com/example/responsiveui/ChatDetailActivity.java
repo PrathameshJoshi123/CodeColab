@@ -436,8 +436,8 @@ public class ChatDetailActivity extends AppCompatActivity {
     }
     
     private void sendTextMessage() {
-        if (sprintId == null || sprintId.isEmpty()) {
-            Toast.makeText(this, "Sprint ID not available", Toast.LENGTH_SHORT).show();
+        if (!hasValidChatTarget()) {
+            Toast.makeText(this, getMissingChatTargetMessage(), Toast.LENGTH_SHORT).show();
             return;
         }
         
@@ -486,8 +486,8 @@ public class ChatDetailActivity extends AppCompatActivity {
             return;
         }
 
-        if (sprintId == null || sprintId.isEmpty()) {
-            Toast.makeText(this, "Sprint ID not available", Toast.LENGTH_SHORT).show();
+        if (!hasValidChatTarget()) {
+            Toast.makeText(this, getMissingChatTargetMessage(), Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -529,7 +529,7 @@ public class ChatDetailActivity extends AppCompatActivity {
             }
         }
 
-        String objectPath = "chat_media/" + sprintId + "/" + UUID.randomUUID() + "." + extension;
+        String objectPath = "chat_media/" + getChatStorageKey() + "/" + UUID.randomUUID() + "." + extension;
         StorageReference mediaRef = storage.getReference().child(objectPath);
 
         UploadTask uploadTask = mediaRef.putFile(uri);
@@ -641,6 +641,22 @@ public class ChatDetailActivity extends AppCompatActivity {
                 Toast.makeText(ChatDetailActivity.this, "Error sending message: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });
+    }
+
+    private boolean hasValidChatTarget() {
+        String idToUse = isDirectMessage ? conversationId : sprintId;
+        return idToUse != null && !idToUse.trim().isEmpty();
+    }
+
+    @NonNull
+    private String getMissingChatTargetMessage() {
+        return isDirectMessage ? "Conversation ID not available" : "Sprint ID not available";
+    }
+
+    @NonNull
+    private String getChatStorageKey() {
+        String idToUse = isDirectMessage ? conversationId : sprintId;
+        return (idToUse == null || idToUse.trim().isEmpty()) ? "unknown" : idToUse.trim();
     }
     
     @Override
