@@ -14,6 +14,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.HorizontalScrollView;
+import androidx.appcompat.app.AlertDialog;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.cardview.widget.CardView;
@@ -22,6 +23,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.responsiveui.api.ApiConfig;
 import com.example.responsiveui.api.CodeCollabApiService;
+import com.example.responsiveui.api.models.JoinRequestMatchResponse;
 import com.example.responsiveui.api.models.MatchRequestResponse;
 import com.example.responsiveui.api.models.SprintSessionResponse;
 import retrofit2.Call;
@@ -47,10 +49,12 @@ import com.google.firebase.auth.FirebaseAuth;
  */
 public class MatchesFragment extends Fragment implements MatchAdapter.MatchActionListener, 
                                                         CreateMatchRequestDialogFragment.CreateMatchListener,
-                                                        MyRequestsAdapter.MyRequestActionListener {
+                                                        MyRequestsAdapter.MyRequestActionListener,
+                                                        JoinRequestsAdapter.JoinRequestActionListener {
     
     private RecyclerView matchesRecyclerView;
     private RecyclerView myRequestsRecyclerView;
+    private RecyclerView joinRequestsRecyclerView;
     private RecyclerView receivedMatchesRecyclerView;
     private ProgressBar loadingProgress;
     private LinearLayout emptyState;
@@ -60,10 +64,12 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private Button btnCreateMatch;
     private Button tabBrowse;
     private Button tabMyRequests;
+    private Button tabJoinRequests;
     private Button tabAccepted;
     private EditText searchSkillsInput;
     private MatchAdapter matchAdapter;
     private MyRequestsAdapter myRequestsAdapter;
+    private JoinRequestsAdapter joinRequestsAdapter;
     private MatchAdapter receivedMatchesAdapter;
     private CodeCollabApiService apiService;
     
@@ -74,7 +80,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private CardView filterLearning;
     
     private String currentFilter = null;  // null = All
-    private String currentTab = "browse";  // "browse", "requests", or "accepted"
+    private String currentTab = "browse";  // "browse", "requests", "join_requests", or "accepted"
     private HorizontalScrollView filterScroll;  // Filter buttons container
     private List<MatchRequestResponse> allMatches = new ArrayList<>();  // Cache all matches for search
 
@@ -92,6 +98,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         // Initialize UI components
         matchesRecyclerView = view.findViewById(R.id.matchesRecyclerView);
         myRequestsRecyclerView = view.findViewById(R.id.myRequestsRecyclerView);
+        joinRequestsRecyclerView = view.findViewById(R.id.joinRequestsRecyclerView);
         receivedMatchesRecyclerView = view.findViewById(R.id.receivedMatchesRecyclerView);
         loadingProgress = view.findViewById(R.id.loadingProgress);
         emptyState = view.findViewById(R.id.emptyState);
@@ -103,6 +110,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         
         tabBrowse = view.findViewById(R.id.tabBrowse);
         tabMyRequests = view.findViewById(R.id.tabMyRequests);
+        tabJoinRequests = view.findViewById(R.id.tabJoinRequests);
         tabAccepted = view.findViewById(R.id.tabReceiver);
         
         filterAll = view.findViewById(R.id.filterAll);
@@ -120,6 +128,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         // Setup RecyclerViews
         setupRecyclerView();
         setupMyRequestsRecyclerView();
+        setupJoinRequestsRecyclerView();
         setupReceivedMatchesRecyclerView();
         
         // Setup tab buttons
@@ -140,22 +149,29 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         handleNotificationIntent();
         
         // Load browse matches initially
-        loadMatches(null);
+        if ("browse".equals(currentTab)) {
+            loadMatches(null);
+        }
     }
 
     // ==================== Handle Notification Intent ====================
     
     private void handleNotificationIntent() {
         Bundle args = getArguments();
-        if (args != null && args.getBoolean("SHOW_MATCH_DETAILS", false)) {
-            String matchId = args.getString("MATCH_ID");
-            if (matchId != null) {
-                // Show the match details in browse tab
-                switchTab("browse");
-                // Optionally: scroll to match, highlight it, or show details dialog
-                args.remove("SHOW_MATCH_DETAILS");
-                args.remove("MATCH_ID");
-            }
+        if (args == null) {
+            return;
+        }
+
+        String targetTab = args.getString("TARGET_MATCH_TAB");
+        if (targetTab != null && !targetTab.isEmpty()) {
+            switchTab(targetTab);
+            return;
+        }
+
+        if (args.getBoolean("SHOW_MATCH_DETAILS", false)) {
+            switchTab("browse");
+            args.remove("SHOW_MATCH_DETAILS");
+            args.remove("MATCH_ID");
         }
     }
 
@@ -177,6 +193,15 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         myRequestsAdapter = new MyRequestsAdapter(new ArrayList<>(), getContext());
         myRequestsAdapter.setListener(this);
         myRequestsRecyclerView.setAdapter(myRequestsAdapter);
+    }
+
+    private void setupJoinRequestsRecyclerView() {
+        LinearLayoutManager layoutManager = new LinearLayoutManager(getContext());
+        joinRequestsRecyclerView.setLayoutManager(layoutManager);
+
+        joinRequestsAdapter = new JoinRequestsAdapter(new ArrayList<>(), getContext());
+        joinRequestsAdapter.setListener(this);
+        joinRequestsRecyclerView.setAdapter(joinRequestsAdapter);
     }
 
     private void setupReceivedMatchesRecyclerView() {
@@ -248,6 +273,7 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
     private void setupTabButtons() {
         tabBrowse.setOnClickListener(v -> switchTab("browse"));
         tabMyRequests.setOnClickListener(v -> switchTab("requests"));
+        tabJoinRequests.setOnClickListener(v -> switchTab("join_requests"));
         tabAccepted.setOnClickListener(v -> switchTab("accepted"));
     }
 
@@ -265,12 +291,15 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         tabBrowse.setTextColor(getResources().getColor(R.color.text_muted, null));
         tabMyRequests.setBackgroundResource(R.drawable.bg_button_outline);
         tabMyRequests.setTextColor(getResources().getColor(R.color.text_muted, null));
+        tabJoinRequests.setBackgroundResource(R.drawable.bg_button_outline);
+        tabJoinRequests.setTextColor(getResources().getColor(R.color.text_muted, null));
         tabAccepted.setBackgroundResource(R.drawable.bg_button_outline);
         tabAccepted.setTextColor(getResources().getColor(R.color.text_muted, null));
         
         // Hide all recycler views
         matchesRecyclerView.setVisibility(View.GONE);
         myRequestsRecyclerView.setVisibility(View.GONE);
+        joinRequestsRecyclerView.setVisibility(View.GONE);
         receivedMatchesRecyclerView.setVisibility(View.GONE);
 
         updateEmptyStateCopy();
@@ -297,6 +326,17 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             searchSkillsInput.setVisibility(View.GONE);
             
             loadMyRequests();
+        } else if (tab.equals("join_requests")) {
+            // Switch to Join Requests tab
+            tabJoinRequests.setBackgroundResource(R.drawable.bg_button_solid_blue);
+            tabJoinRequests.setTextColor(getResources().getColor(R.color.text_white, null));
+
+            joinRequestsRecyclerView.setVisibility(View.VISIBLE);
+            filterScroll.setVisibility(View.GONE);
+            searchCardView.setVisibility(View.GONE);
+            searchSkillsInput.setVisibility(View.GONE);
+
+            loadJoinRequests();
         } else if (tab.equals("accepted")) {
             // Switch to Accepted tab
             tabAccepted.setBackgroundResource(R.drawable.bg_button_solid_blue);
@@ -450,6 +490,44 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         });
     }
 
+    // ==================== Load Join Requests ====================
+
+    private void loadJoinRequests() {
+        showLoading(true);
+
+        Call<List<JoinRequestMatchResponse>> call = apiService.getJoinRequestsForMyMatches();
+
+        call.enqueue(new Callback<List<JoinRequestMatchResponse>>() {
+            @Override
+            public void onResponse(@NonNull Call<List<JoinRequestMatchResponse>> call,
+                                   @NonNull Response<List<JoinRequestMatchResponse>> response) {
+                showLoading(false);
+
+                if (response.isSuccessful() && response.body() != null) {
+                    List<JoinRequestMatchResponse> requests = response.body();
+
+                    if (requests.isEmpty()) {
+                        showEmptyState(true);
+                        joinRequestsAdapter.updateJoinRequests(new ArrayList<>());
+                    } else {
+                        showEmptyState(false);
+                        joinRequestsAdapter.updateJoinRequests(requests);
+                    }
+                } else {
+                    Toast.makeText(getContext(), "Failed to load join requests", Toast.LENGTH_SHORT).show();
+                    showEmptyState(true);
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<List<JoinRequestMatchResponse>> call, @NonNull Throwable t) {
+                showLoading(false);
+                Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                showEmptyState(true);
+            }
+        });
+    }
+
     // ==================== Load Accepted Matches ====================
     
     private void loadAcceptedMatches() {
@@ -500,11 +578,11 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             public void onResponse(@NonNull Call<MatchRequestResponse> call, 
                                  @NonNull Response<MatchRequestResponse> response) {
                 if (response.isSuccessful()) {
-                    Toast.makeText(getContext(), "Match accepted! 🎉", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Join request sent!", Toast.LENGTH_SHORT).show();
                     // Reload matches
                     loadMatches(currentFilter);
                 } else {
-                    Toast.makeText(getContext(), "Failed to accept match", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getContext(), "Unable to send join request", Toast.LENGTH_SHORT).show();
                 }
             }
 
@@ -572,6 +650,126 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         }
 
         openSprintDetailsFromMatch(match.id);
+    }
+
+    @Override
+    public void onOpenInterestedUsers(JoinRequestMatchResponse item) {
+        if (item == null || item.interestedUsers == null || item.interestedUsers.isEmpty()) {
+            Toast.makeText(getContext(), "No interested users yet", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] labels = new String[item.interestedUsers.size()];
+        for (int i = 0; i < item.interestedUsers.size(); i++) {
+            JoinRequestMatchResponse.InterestedUser user = item.interestedUsers.get(i);
+            labels[i] = user.getDisplayName() + " (Level " + user.level + ", Streak " + user.streakCount + ")";
+        }
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Interested Users")
+                .setItems(labels, (dialog, which) -> {
+                    JoinRequestMatchResponse.InterestedUser selectedUser = item.interestedUsers.get(which);
+                    showInterestedUserDetails(item, selectedUser);
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private void showInterestedUserDetails(
+            JoinRequestMatchResponse matchItem,
+            JoinRequestMatchResponse.InterestedUser user
+    ) {
+        if (user == null) {
+            return;
+        }
+
+        StringBuilder detailBuilder = new StringBuilder();
+        detailBuilder.append("Bio: ").append(user.bio != null && !user.bio.isEmpty() ? user.bio : "Not shared").append("\n\n");
+        detailBuilder.append("College: ").append(user.college != null && !user.college.isEmpty() ? user.college : "Not shared").append("\n");
+        detailBuilder.append("City: ").append(user.city != null && !user.city.isEmpty() ? user.city : "Not shared").append("\n");
+        detailBuilder.append("Level: ").append(user.level).append("\n");
+        detailBuilder.append("Streak: ").append(user.streakCount).append("\n");
+        detailBuilder.append("Karma: ").append(user.karmaScore).append("\n");
+        detailBuilder.append("XP: ").append(user.xpPoints).append("\n");
+        detailBuilder.append("GitHub: ").append(user.githubUsername != null && !user.githubUsername.isEmpty() ? user.githubUsername : "Not shared").append("\n");
+        detailBuilder.append("LinkedIn: ").append(user.linkedinUrl != null && !user.linkedinUrl.isEmpty() ? user.linkedinUrl : "Not shared").append("\n\n");
+        detailBuilder.append("Skills:\n").append(formatInterestedUserSkills(user));
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle(user.getDisplayName())
+                .setMessage(detailBuilder.toString())
+                .setPositiveButton("Select User", (dialog, which) -> {
+                    if (matchItem.matchId == null || user.userId == null) {
+                        Toast.makeText(getContext(), "Unable to select this user", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
+                    confirmAndSelectUser(matchItem.matchId, user.userId, user.getDisplayName());
+                })
+                .setNegativeButton("Close", null)
+                .show();
+    }
+
+    private String formatInterestedUserSkills(JoinRequestMatchResponse.InterestedUser user) {
+        if (user.skills == null || user.skills.isEmpty()) {
+            return "No skills added";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        for (MatchRequestResponse.UserSkillInfo skill : user.skills) {
+            String skillName = skill.name != null ? skill.name : "Unknown Skill";
+            String proficiency = skill.proficiencyLevel != null ? skill.proficiencyLevel : "beginner";
+            String experience = skill.yearsOfExperience != null
+                    ? ", " + skill.yearsOfExperience + " yrs"
+                    : "";
+
+            builder.append("- ")
+                    .append(skillName)
+                    .append(" (")
+                    .append(proficiency)
+                    .append(experience)
+                    .append(")\n");
+        }
+
+        return builder.toString();
+    }
+
+    private void confirmAndSelectUser(String matchId, String userId, String displayName) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Confirm Selection")
+                .setMessage("Select " + displayName + " for this match? Other join requests will be rejected.")
+                .setPositiveButton("Confirm", (dialog, which) -> selectUserForMatch(matchId, userId))
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void selectUserForMatch(String matchId, String userId) {
+        if (apiService == null) {
+            return;
+        }
+
+        showLoading(true);
+        Call<MatchRequestResponse> call = apiService.selectMatchPartner(matchId, userId);
+        call.enqueue(new Callback<MatchRequestResponse>() {
+            @Override
+            public void onResponse(@NonNull Call<MatchRequestResponse> call,
+                                   @NonNull Response<MatchRequestResponse> response) {
+                showLoading(false);
+
+                if (response.isSuccessful()) {
+                    Toast.makeText(getContext(), "Collaborator selected successfully", Toast.LENGTH_SHORT).show();
+                    loadJoinRequests();
+                } else {
+                    Toast.makeText(getContext(), "Failed to select collaborator", Toast.LENGTH_SHORT).show();
+                }
+            }
+
+            @Override
+            public void onFailure(@NonNull Call<MatchRequestResponse> call, @NonNull Throwable t) {
+                showLoading(false);
+                Toast.makeText(getContext(), "Error: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void fetchMatchDetailsAndOpenSetup(String matchId, String fallbackName) {
@@ -680,6 +878,8 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
             matchesRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
         } else if (currentTab.equals("requests")) {
             myRequestsRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
+        } else if (currentTab.equals("join_requests")) {
+            joinRequestsRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
         } else if (currentTab.equals("accepted")) {
             receivedMatchesRecyclerView.setVisibility(show ? View.GONE : View.VISIBLE);
         }
@@ -696,6 +896,9 @@ public class MatchesFragment extends Fragment implements MatchAdapter.MatchActio
         } else if ("requests".equals(currentTab)) {
             emptyStateTitle.setText("No Requests Created Yet");
             emptyStateSubtitle.setText("Create your first request from the + Create button");
+        } else if ("join_requests".equals(currentTab)) {
+            emptyStateTitle.setText("No Join Requests Yet");
+            emptyStateSubtitle.setText("Interested users for your matches will appear here");
         } else {
             emptyStateTitle.setText("No Accepted Requests Yet");
             emptyStateSubtitle.setText("Accepted requests from Browse will appear here");

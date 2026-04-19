@@ -154,9 +154,10 @@ async def send_message(
 async def get_messages(
     session_id: str,
     limit: int = 50,
+    offset: int = 0,
     credentials = Depends(security)
 ):
-    """Get messages from a sprint session chat"""
+    """Get messages from a sprint session chat - PAGINATED & OPTIMIZED"""
     try:
         user_id = await get_current_user(credentials)
         db = get_db()
@@ -177,18 +178,19 @@ async def get_messages(
                 detail="Not a participant in this sprint"
             )
         
-        # Fetch messages ordered by created_at
+        # Fetch messages ordered by created_at, with pagination
         messages_query = db.collection("chatMessages").where(
             filter=FieldFilter("sprint_id", "==", session_id)
         ).order_by(
             "created_at"
-        ).limit(limit)
+        )
         
-        messages = []
+        all_messages = []
         for doc in messages_query.stream():
-            messages.append(doc.to_dict())
+            all_messages.append(doc.to_dict())
         
-        return messages
+        # Apply pagination
+        return all_messages[offset : offset + limit]
     
     except HTTPException:
         raise

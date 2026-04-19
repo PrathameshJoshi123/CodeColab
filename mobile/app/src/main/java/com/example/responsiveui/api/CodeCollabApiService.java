@@ -198,6 +198,15 @@ public interface CodeCollabApiService {
     
     @GET("/matches/user/received")
     Call<List<MatchRequestResponse>> getReceivedMatchRequests();
+
+    @GET("/matches/user/join-requests")
+    Call<List<JoinRequestMatchResponse>> getJoinRequestsForMyMatches();
+
+    @PUT("/matches/{matchId}/select/{selectedUserId}")
+    Call<MatchRequestResponse> selectMatchPartner(
+            @Path("matchId") String matchId,
+            @Path("selectedUserId") String selectedUserId
+    );
     
     @DELETE("/matches/{matchId}")
     Call<Void> cancelMatchRequest(@Path("matchId") String matchId);

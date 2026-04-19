@@ -132,6 +132,114 @@ class FCMService:
             return False
 
     @staticmethod
+    def send_match_selected_notification(selected_user_id: str, requester_name: str, match_id: str):
+        """
+        Send notification when requester selects a collaborator from join requests.
+
+        Args:
+            selected_user_id: UID of selected collaborator
+            requester_name: Name of requester who made the selection
+            match_id: ID of the match request
+        """
+        try:
+            db = get_db()
+            user_doc = db.collection("users").document(selected_user_id).get()
+
+            if not user_doc.exists:
+                logger.warning(f"Selected user {selected_user_id} not found")
+                return False
+
+            user_data = user_doc.to_dict()
+            fcm_token = user_data.get("fcm_token")
+
+            if not fcm_token:
+                logger.warning(f"FCM token not found for selected user {selected_user_id}")
+                return False
+
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title="You're Selected! 🎯",
+                    body=f"{requester_name} selected you for collaboration"
+                ),
+                data={
+                    "match_id": match_id,
+                    "type": "MATCH_SELECTED",
+                    "requester_name": requester_name
+                },
+                token=fcm_token
+            )
+
+            response = messaging.send(message)
+            logger.info(f"✓ Match selected notification sent: {response}")
+
+            FCMService._log_notification(
+                selected_user_id,
+                "MATCH_SELECTED",
+                f"{requester_name} selected you for collaboration",
+                match_id
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"✗ Failed to send selected notification: {str(e)}", exc_info=True)
+            return False
+
+    @staticmethod
+    def send_match_not_selected_notification(user_id: str, requester_name: str, match_id: str):
+        """
+        Send notification when requester rejects an interested candidate.
+
+        Args:
+            user_id: UID of candidate who was not selected
+            requester_name: Name of requester who made the selection
+            match_id: ID of the match request
+        """
+        try:
+            db = get_db()
+            user_doc = db.collection("users").document(user_id).get()
+
+            if not user_doc.exists:
+                logger.warning(f"User {user_id} not found")
+                return False
+
+            user_data = user_doc.to_dict()
+            fcm_token = user_data.get("fcm_token")
+
+            if not fcm_token:
+                logger.warning(f"FCM token not found for user {user_id}")
+                return False
+
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title="Join Request Update",
+                    body=f"{requester_name} selected another collaborator this time"
+                ),
+                data={
+                    "match_id": match_id,
+                    "type": "MATCH_NOT_SELECTED",
+                    "requester_name": requester_name
+                },
+                token=fcm_token
+            )
+
+            response = messaging.send(message)
+            logger.info(f"✓ Match not selected notification sent: {response}")
+
+            FCMService._log_notification(
+                user_id,
+                "MATCH_NOT_SELECTED",
+                f"{requester_name} selected another collaborator this time",
+                match_id
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"✗ Failed to send not selected notification: {str(e)}", exc_info=True)
+            return False
+
+    @staticmethod
     def send_match_created_notification(match_id: str, match_data: dict, requester_name: str):
         """
         Send notifications to all users with required skills when a match is created
@@ -276,6 +384,16 @@ def send_match_accepted_notification(requester_id: str, accepter_name: str, matc
 def send_match_rejected_notification(requester_id: str, rejecter_name: str, match_id: str):
     """Convenience function to send match rejection notification"""
     return FCMService.send_match_rejection_notification(requester_id, rejecter_name, match_id)
+
+
+def send_match_selected_notification(selected_user_id: str, requester_name: str, match_id: str):
+    """Convenience function to send selected collaborator notification"""
+    return FCMService.send_match_selected_notification(selected_user_id, requester_name, match_id)
+
+
+def send_match_not_selected_notification(user_id: str, requester_name: str, match_id: str):
+    """Convenience function to send rejected candidate notification"""
+    return FCMService.send_match_not_selected_notification(user_id, requester_name, match_id)
 
 
 def send_sprint_confirmation_notification(partner_id: str, confirmer_name: str, sprint_id: str, goal_title: str):

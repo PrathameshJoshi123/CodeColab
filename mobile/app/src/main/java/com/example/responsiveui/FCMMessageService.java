@@ -125,6 +125,7 @@ public class FCMMessageService extends FirebaseMessagingService {
         if ("MATCH_CREATED".equals(notificationType)) {
             // User received a match created notification - open matches fragment with details
             intent.putExtra("OPEN_MATCHES_TAB", true);
+            intent.putExtra("TARGET_MATCH_TAB", "browse");
             intent.putExtra("MATCH_ID", matchId);
             intent.putExtra("SHOW_MATCH_DETAILS", true);
             intent.putExtra("REQUESTER_NAME", requesterName != null ? requesterName : "Someone");
@@ -132,6 +133,14 @@ public class FCMMessageService extends FirebaseMessagingService {
             intent.putExtra("OPEN_SPRINT_SETUP", true);
             intent.putExtra("MATCH_ID", matchId);
             intent.putExtra("PARTNER_NAME", accepterName != null ? accepterName : "Partner");
+        } else if ("MATCH_SELECTED".equals(notificationType)) {
+            intent.putExtra("OPEN_MATCHES_TAB", true);
+            intent.putExtra("TARGET_MATCH_TAB", "accepted");
+            intent.putExtra("MATCH_ID", matchId);
+            intent.putExtra("PARTNER_NAME", requesterName != null ? requesterName : "Partner");
+        } else if ("MATCH_NOT_SELECTED".equals(notificationType)) {
+            intent.putExtra("OPEN_MATCHES_TAB", true);
+            intent.putExtra("TARGET_MATCH_TAB", "browse");
         } else if ("SPRINT_CONFIRMED".equals(notificationType)) {
             intent.putExtra("OPEN_SPRINT_DETAILS", true);
             intent.putExtra("SPRINT_ID", sprintId);

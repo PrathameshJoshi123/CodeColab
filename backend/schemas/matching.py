@@ -22,6 +22,11 @@ class MatchRequest(BaseModel):
     scheduled_date_time: Optional[datetime] = None
     accepted_by: Optional[str] = None
     accepted_at: Optional[datetime] = None
+    selected_user_id: Optional[str] = None
+    selected_at: Optional[datetime] = None
+    interested_user_ids: Optional[List[str]] = None
+    rejected_user_ids: Optional[List[str]] = None
+    join_requests: Optional[List[dict]] = None
     rejected_by: Optional[str] = None
     rejected_at: Optional[datetime] = None
     linked_sprint_id: Optional[str] = None
@@ -29,6 +34,7 @@ class MatchRequest(BaseModel):
     is_exhausted: Optional[bool] = False
     can_setup_sprint: Optional[bool] = False
     created_at: datetime
+    updated_at: Optional[datetime] = None
 
 # ==================== Match User Profile Models ====================
 

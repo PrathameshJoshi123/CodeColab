@@ -25,8 +25,8 @@ public class ApiConfig {
     //
     // Production:
     //   Use: https://your-domain.com
-    //192.168.171.23
-    private static final String BASE_URL = "http://192.168.171.23:8000/"; // UPDATE TO YOUR MACHINE IP
+    //192.168.29.99
+    private static final String BASE_URL = "http://192.168.29.99:8000/"; // UPDATE TO YOUR MACHINE IP
     
     private static Retrofit retrofit;
     private static OkHttpClient okHttpClient;

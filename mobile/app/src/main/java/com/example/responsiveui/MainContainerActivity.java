@@ -58,6 +58,24 @@ public class MainContainerActivity extends AppCompatActivity {
                 Intent detailsIntent = new Intent(this, SprintDetailsActivity.class);
                 detailsIntent.putExtra("SPRINT_ID", sprintId);
                 startActivity(detailsIntent);
+            } else if (intent != null && intent.getBooleanExtra("OPEN_MATCHES_TAB", false)) {
+                MatchesFragment matchesFragment = new MatchesFragment();
+                Bundle args = new Bundle();
+
+                if (intent.hasExtra("TARGET_MATCH_TAB")) {
+                    args.putString("TARGET_MATCH_TAB", intent.getStringExtra("TARGET_MATCH_TAB"));
+                }
+                if (intent.hasExtra("MATCH_ID")) {
+                    args.putString("MATCH_ID", intent.getStringExtra("MATCH_ID"));
+                }
+                if (intent.hasExtra("SHOW_MATCH_DETAILS")) {
+                    args.putBoolean("SHOW_MATCH_DETAILS", intent.getBooleanExtra("SHOW_MATCH_DETAILS", false));
+                }
+
+                matchesFragment.setArguments(args);
+                getSupportFragmentManager().beginTransaction()
+                        .replace(R.id.fragment_container, matchesFragment)
+                        .commit();
             } else {
                 // Normal flow - show matches
                 getSupportFragmentManager().beginTransaction()

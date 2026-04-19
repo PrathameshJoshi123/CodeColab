@@ -109,25 +109,40 @@ async def create_skill(skill: SkillCreate, credentials = Depends(security)):
 
 @router.get("/{user_id}/skills", response_model=list[UserSkillResponse])
 async def get_user_skills(user_id: str):
-    """Get all skills for a user"""
+    """Get all skills for a user - OPTIMIZED with batch skill lookups"""
     try:
         db = get_db()
         
         # Query userSkills collection
-        user_skills = db.collection("userSkills").where(
+        user_skills = list(db.collection("userSkills").where(
             filter=FieldFilter("userId", "==", user_id)
-        ).stream()
+        ).stream())
         
-        skill_list = []
+        # Collect all skill IDs first
+        skill_ids = []
+        skill_data_map = {}
+        
         for user_skill in user_skills:
             us_data = user_skill.to_dict()
-            
-            # Get skill details
-            skill_doc = db.collection("skills").document(us_data["skillId"]).get()
-            skill_data = skill_doc.to_dict() if skill_doc.exists else {}
+            skill_id = us_data.get("skillId")
+            if skill_id:
+                skill_ids.append(skill_id)
+                skill_data_map[skill_id] = us_data
+        
+        # Batch fetch all skill documents
+        skill_details = {}
+        for skill_id in set(skill_ids):
+            skill_doc = db.collection("skills").document(skill_id).get()
+            if skill_doc.exists:
+                skill_details[skill_id] = skill_doc.to_dict()
+        
+        # Build response using cached data
+        skill_list = []
+        for skill_id, us_data in skill_data_map.items():
+            skill_data = skill_details.get(skill_id, {})
             
             skill_list.append(UserSkillResponse(
-                skillId=us_data["skillId"],
+                skillId=skill_id,
                 name=skill_data.get("name", ""),
                 category=skill_data.get("category", ""),
                 proficiency_level=us_data.get("proficiency_level", "")
