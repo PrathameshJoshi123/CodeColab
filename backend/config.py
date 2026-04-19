@@ -6,7 +6,8 @@ class Settings(BaseSettings):
     """Application settings loaded from environment variables"""
     
     # Firebase
-    FIREBASE_KEY_PATH: str = "firebase-key.json"
+    FIREBASE_KEY_PATH: Optional[str] = "firebase-key.json"
+    FIREBASE_KEY_JSON: Optional[str] = None  # For Vercel: pass complete JSON as string
     FIREBASE_DATABASE_URL: Optional[str] = None
     
     # API
