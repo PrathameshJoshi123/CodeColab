@@ -198,6 +198,245 @@ async def get_messages(
             detail=str(e)
         )
 
+
+# ==================== Direct Messages (WhatsApp-like) ====================
+
+def _get_conversation_id(user1_id: str, user2_id: str) -> str:
+    """Generate consistent conversation ID for two users"""
+    users = sorted([user1_id, user2_id])
+    return f"{users[0]}_{users[1]}"
+
+
+@router.post("/dm/create")
+async def create_or_get_conversation(
+    recipient_data: dict,
+    credentials = Depends(security)
+):
+    """Create or get existing direct message conversation"""
+    try:
+        current_user_id = await get_current_user(credentials)
+        recipient_id = recipient_data.get("user_id")
+        
+        if not recipient_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="recipient user_id is required"
+            )
+        
+        if current_user_id == recipient_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot chat with yourself"
+            )
+        
+        db = get_db()
+        
+        # Verify recipient exists
+        recipient_doc = db.collection("users").document(recipient_id).get()
+        if not recipient_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Recipient user not found"
+            )
+        
+        conversation_id = _get_conversation_id(current_user_id, recipient_id)
+        conversation_ref = db.collection("conversations").document(conversation_id)
+        conversation_doc = conversation_ref.get()
+        
+        if conversation_doc.exists:
+            return conversation_doc.to_dict()
+        
+        # Create new conversation
+        now = datetime.utcnow()
+        conversation = {
+            "id": conversation_id,
+            "participants": [current_user_id, recipient_id],
+            "created_at": now,
+            "updated_at": now,
+            "last_message": None,
+            "last_message_sender": None,
+            "message_count": 0
+        }
+        
+        conversation_ref.set(conversation)
+        return conversation
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.post("/dm/{conversation_id}/send")
+async def send_direct_message(
+    conversation_id: str,
+    message_data: dict,
+    credentials = Depends(security)
+):
+    """Send a direct message"""
+    try:
+        current_user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        # Verify conversation exists
+        conversation_doc = db.collection("conversations").document(conversation_id).get()
+        if not conversation_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+        
+        conversation_data = conversation_doc.to_dict()
+        
+        # Verify user is participant
+        if current_user_id not in conversation_data.get("participants", []):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this conversation"
+            )
+        
+        # Validate and prepare message
+        content = (message_data.get("content") or "").strip()
+        message_type = (message_data.get("message_type") or "text").strip().lower()
+        
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Message content cannot be empty"
+            )
+        
+        message_id = str(uuid.uuid4())
+        sender_name = _resolve_sender_name(db, current_user_id)
+        
+        message_document = {
+            "id": message_id,
+            "conversation_id": conversation_id,
+            "sender_id": current_user_id,
+            "sender_name": sender_name,
+            "content": content,
+            "message_type": message_type,
+            "created_at": datetime.utcnow()
+        }
+        
+        if message_data.get("media_url"):
+            message_document["media_url"] = message_data.get("media_url")
+        
+        # Store message
+        db.collection("directMessages").document(message_id).set(message_document)
+        
+        # Update conversation metadata
+        db.collection("conversations").document(conversation_id).update({
+            "updated_at": datetime.utcnow(),
+            "last_message": content[:100],
+            "last_message_sender": sender_name,
+            "message_count": len(db.collection("directMessages").where(
+                filter=FieldFilter("conversation_id", "==", conversation_id)
+            ).stream())
+        })
+        
+        return message_document
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.get("/dm/{conversation_id}/messages")
+async def get_conversation_history(
+    conversation_id: str,
+    limit: int = 50,
+    credentials = Depends(security)
+):
+    """Get message history for a conversation"""
+    try:
+        current_user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        # Verify conversation exists
+        conversation_doc = db.collection("conversations").document(conversation_id).get()
+        if not conversation_doc.exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+        
+        conversation_data = conversation_doc.to_dict()
+        
+        # Verify user is participant
+        if current_user_id not in conversation_data.get("participants", []):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a participant in this conversation"
+            )
+        
+        # Fetch messages ordered by created_at
+        messages = []
+        query = db.collection("directMessages").where(
+            filter=FieldFilter("conversation_id", "==", conversation_id)
+        ).order_by("created_at", direction="DESCENDING").limit(limit)
+        
+        for doc in query.stream():
+            messages.insert(0, doc.to_dict())  # Insert at beginning to maintain chronological order
+        
+        return messages
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@router.get("/dm/conversations")
+async def get_my_conversations(
+    credentials = Depends(security)
+):
+    """Get all conversations for current user"""
+    try:
+        current_user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        conversations = []
+        query = db.collection("conversations").where(
+            filter=FieldFilter("participants", "array-contains", current_user_id)
+        ).order_by("updated_at", direction="DESCENDING")
+        
+        for doc in query.stream():
+            conv_data = doc.to_dict()
+            
+            # Add partner info
+            partner_id = conv_data["participants"][0] if conv_data["participants"][0] != current_user_id else conv_data["participants"][1]
+            partner_doc = db.collection("users").document(partner_id).get()
+            partner_data = partner_doc.to_dict() if partner_doc.exists else {}
+            
+            conv_data["partner"] = {
+                "userId": partner_id,
+                "email": partner_data.get("email", ""),
+                "full_name": partner_data.get("full_name", ""),
+                "profile_image_url": partner_data.get("profile_image_url", "")
+            }
+            
+            conversations.append(conv_data)
+        
+        return conversations
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @router.delete("/messages/{message_id}", response_model=dict)
 async def delete_message(
     message_id: str,

@@ -148,6 +148,116 @@ async def get_current_user_profile(credentials = Depends(security)):
             detail=str(e)
         )
 
+# ==================== User Search (MUST be before /{user_id}) ====================
+
+@router.get("/search")
+async def search_users(
+    query: str = None,
+    limit: int = 20,
+    credentials = Depends(security)
+):
+    """
+    Search for users by email, full_name, or pool_name  
+    Used for finding users to start a chat with
+    If no query provided, returns list of available users
+    """
+    try:
+        current_user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        print(f"\n[SEARCH] ========== SEARCH REQUEST ==========")
+        print(f"[SEARCH] Current user ID: {current_user_id}")
+        print(f"[SEARCH] Query: '{query}'")
+        print(f"[SEARCH] Limit: {limit}")
+        
+        if not query:
+            query = ""
+        
+        query_lower = query.lower().strip()
+        results = []
+        users_checked = 0
+        users_skipped_current = 0
+        users_matched = 0
+        
+        # Get all users
+        for user_doc in db.collection("users").stream():
+            user_id = user_doc.id
+            users_checked += 1
+            
+            # Don't include current user in search results
+            if user_id == current_user_id:
+                print(f"[SEARCH] ✗ Skipping current user: {user_id}")
+                users_skipped_current += 1
+                continue
+            
+            user_data = user_doc.to_dict()
+            email = user_data.get("email", "")
+            full_name = user_data.get("full_name", "")
+            pool_name = user_data.get("pool_name", "")
+            bio = user_data.get("bio", "")
+            level = user_data.get("level", 1)
+            karma_score = user_data.get("karma_score", 0)
+            is_available = user_data.get("is_available", True)
+            profile_image_url = user_data.get("profile_image_url", "")
+            
+            print(f"[SEARCH] Checking user {user_id}: {full_name} ({email}) from pool {pool_name}")
+            
+            # Match query against email, full_name, or pool_name
+            if query_lower:
+                email_match = query_lower in email.lower()
+                name_match = query_lower in full_name.lower()
+                pool_match = query_lower in pool_name.lower()
+                matches = email_match or name_match or pool_match
+                print(f"[SEARCH]   Query matches: email={email_match}, name={name_match}, pool={pool_match}, result={matches}")
+            else:
+                # If no query, include all other users
+                matches = True
+                print(f"[SEARCH]   No query specified, including all users")
+            
+            if not matches:
+                print(f"[SEARCH]   ✗ User {user_id} doesn't match query")
+                continue
+            
+            print(f"[SEARCH]   ✓ Found matching user: {user_id} ({full_name})")
+            users_matched += 1
+            
+            results.append({
+                "userId": user_id,
+                "email": email,
+                "full_name": full_name,
+                "bio": bio,
+                "level": level,
+                "karma_score": karma_score,
+                "is_available": is_available,
+                "profile_image_url": profile_image_url
+            })
+            
+            if len(results) >= limit:
+                print(f"[SEARCH] Reached limit of {limit} results")
+                break
+        
+        print(f"[SEARCH] ========== SEARCH SUMMARY ==========")
+        print(f"[SEARCH] Total users checked: {users_checked}")
+        print(f"[SEARCH] Current user skipped: {users_skipped_current}")
+        print(f"[SEARCH] Users matched: {users_matched}")
+        print(f"[SEARCH] Results returned: {len(results)}")
+        for r in results:
+            print(f"[SEARCH]   - {r['full_name']} ({r['email']})")
+        print(f"[SEARCH] ==========================================\n")
+        
+        return results
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH] ✗ Search error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
 @router.get("/{user_id}", response_model=User)
 async def get_user(user_id: str):
     """Get user by ID (public)"""
@@ -175,7 +285,7 @@ async def get_user(user_id: str):
 # ==================== Profile Management ====================
 
 @router.get("/me/profile", response_model=Profile)
-async def get_current_user_profile(credentials = Depends(security)):
+async def get_profile(credentials = Depends(security)):
     """Get current authenticated user's profile"""
     try:
         user_id = await get_current_user(credentials)
@@ -507,7 +617,193 @@ async def register_fcm_token(
         )
 
 
+# Old duplicate routes removed - see correct routes before /{user_id}
+
+@router.get("/search")
+async def search_users(
+    query: str = None,
+    limit: int = 20,
+    credentials = Depends(security)
+):
+    """
+    Search for users by email, name, or other fields
+    Used for finding users to start a chat with
+    If no query provided, returns list of available users
+    """
+    try:
+        current_user_id = await get_current_user(credentials)
+        db = get_db()
+        
+        print(f"\n[SEARCH] ========== SEARCH REQUEST ==========")
+        print(f"[SEARCH] Current user ID: {current_user_id}")
+        print(f"[SEARCH] Query: '{query}'")
+        print(f"[SEARCH] Limit: {limit}")
+        
+        if not query:
+            query = ""
+        
+        query_lower = query.lower().strip()
+        results = []
+        users_checked = 0
+        users_skipped_current = 0
+        users_matched = 0
+        
+        # Get all users
+        for user_doc in db.collection("users").stream():
+            user_id = user_doc.id
+            users_checked += 1
+            
+            # Don't include current user in search results
+            if user_id == current_user_id:
+                print(f"[SEARCH] ✗ Skipping current user: {user_id}")
+                users_skipped_current += 1
+                continue
+            
+            user_data = user_doc.to_dict()
+            email = user_data.get("email", "")
+            full_name = user_data.get("full_name", "")
+            bio = user_data.get("bio", "")
+            level = user_data.get("level", 1)
+            karma_score = user_data.get("karma_score", 0)
+            is_available = user_data.get("is_available", True)
+            profile_image_url = user_data.get("profile_image_url", "")
+            
+            print(f"[SEARCH] Checking user {user_id}: {full_name} ({email})")
+            
+            # Match query against email or full_name
+            if query_lower:
+                email_match = query_lower in email.lower()
+                name_match = query_lower in full_name.lower()
+                matches = email_match or name_match
+                print(f"[SEARCH]   Query matches: email={email_match}, name={name_match}, result={matches}")
+            else:
+                # If no query, include all other users
+                matches = True
+                print(f"[SEARCH]   No query specified, including all users")
+            
+            if not matches:
+                print(f"[SEARCH]   ✗ User {user_id} doesn't match query")
+                continue
+            
+            print(f"[SEARCH]   ✓ Found matching user: {user_id} ({full_name})")
+            users_matched += 1
+            
+            results.append({
+                "userId": user_id,
+                "email": email,
+                "full_name": full_name,
+                "bio": bio,
+                "level": level,
+                "karma_score": karma_score,
+                "is_available": is_available,
+                "profile_image_url": profile_image_url
+            })
+            
+            if len(results) >= limit:
+                print(f"[SEARCH] Reached limit of {limit} results")
+                break
+        
+        print(f"[SEARCH] ========== SEARCH SUMMARY ==========")
+        print(f"[SEARCH] Total users checked: {users_checked}")
+        print(f"[SEARCH] Current user skipped: {users_skipped_current}")
+        print(f"[SEARCH] Users matched: {users_matched}")
+        print(f"[SEARCH] Results returned: {len(results)}")
+        for r in results:
+            print(f"[SEARCH]   - {r['full_name']} ({r['email']})")
+        print(f"[SEARCH] ==========================================\n")
+        
+        return results
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[SEARCH] ✗ Search error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
 # ==================== Test Endpoints ====================
+
+@router.get("/test/list-all-users")
+async def test_list_all_users():
+    """
+    TEST ENDPOINT: List all users in the database
+    This helps debug database issues
+    """
+    try:
+        db = get_db()
+        users_list = []
+        for user_doc in db.collection("users").stream():
+            user_data = user_doc.to_dict()
+            users_list.append({
+                "userId": user_doc.id,
+                "email": user_data.get("email"),
+                "full_name": user_data.get("full_name"),
+                "level": user_data.get("level"),
+                "karma_score": user_data.get("karma_score")
+            })
+        
+        print(f"[TEST] Total users in database: {len(users_list)}")
+        for user in users_list:
+            print(f"[TEST] User: {user}")
+        
+        return {
+            "total_users": len(users_list),
+            "users": users_list
+        }
+    except Exception as e:
+        print(f"Error listing users: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@router.get("/test/search-debug")
+async def test_search_debug(query: str = "", limit: int = 20):
+    """
+    TEST ENDPOINT: Search without authentication to test database queries
+    """
+    try:
+        db = get_db()
+        query_lower = query.lower().strip() if query else ""
+        results = []
+        
+        print(f"\n[TEST_SEARCH] Query: '{query}' (lowercase: '{query_lower}')")
+        
+        for user_doc in db.collection("users").stream():
+            user_id = user_doc.id
+            user_data = user_doc.to_dict()
+            email = user_data.get("email", "")
+            full_name = user_data.get("full_name", "")
+            
+            if query_lower:
+                email_match = query_lower in email.lower()
+                name_match = query_lower in full_name.lower()
+                matches = email_match or name_match
+            else:
+                matches = True
+            
+            print(f"[TEST_SEARCH] {user_id}: {full_name} ({email}) - Match: {matches}")
+            
+            if matches:
+                results.append({
+                    "userId": user_id,
+                    "email": email,
+                    "full_name": full_name,
+                    "level": user_data.get("level", 1),
+                    "karma_score": user_data.get("karma_score", 0)
+                })
+                if len(results) >= limit:
+                    break
+        
+        return {"query": query, "results": results, "count": len(results)}
+    except Exception as e:
+        print(f"Error in test search: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/test/send-notification")
 async def test_send_notification(

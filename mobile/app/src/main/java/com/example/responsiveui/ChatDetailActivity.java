@@ -65,8 +65,11 @@ public class ChatDetailActivity extends AppCompatActivity {
     // ==================== Variables ====================
     
     private String sprintId;
+    private String conversationId;
     private String partnerName;
+    private String partnerId;
     private String currentUserId;
+    private boolean isDirectMessage = false;
     
     private ScrollView scrollMessages;
     private LinearLayout messagesContainer;
@@ -106,7 +109,12 @@ public class ChatDetailActivity extends AppCompatActivity {
         
         // ==================== Extract Intent Data ====================
         sprintId = getIntent().getStringExtra("SPRINT_ID");
+        conversationId = getIntent().getStringExtra("CONVERSATION_ID");
         partnerName = getIntent().getStringExtra("PARTNER_NAME");
+        partnerId = getIntent().getStringExtra("PARTNER_ID");
+        
+        // Determine if this is a direct message or sprint chat
+        isDirectMessage = conversationId != null && !conversationId.isEmpty();
 
         // ==================== User Identity Setup ====================
         TokenManager.init(this);
@@ -155,8 +163,11 @@ public class ChatDetailActivity extends AppCompatActivity {
     }
 
     private void loadMessagesFromApi(boolean showLoader) {
-        if (sprintId == null || sprintId.isEmpty()) {
-            Toast.makeText(this, "Sprint ID not available", Toast.LENGTH_SHORT).show();
+        // Check if we have either sprintId or conversationId
+        String idToUse = isDirectMessage ? conversationId : sprintId;
+        
+        if (idToUse == null || idToUse.isEmpty()) {
+            Toast.makeText(this, isDirectMessage ? "Conversation ID not available" : "Sprint ID not available", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -169,35 +180,73 @@ public class ChatDetailActivity extends AppCompatActivity {
         }
 
         isMessageRequestInFlight = true;
-        apiService.getMessages(sprintId, 100).enqueue(new Callback<List<Map<String, Object>>>() {
-            @Override
-            public void onResponse(@NonNull Call<List<Map<String, Object>>> call, @NonNull Response<List<Map<String, Object>>> response) {
-                isMessageRequestInFlight = false;
+        
+        // Call appropriate API method based on message type
+        if (isDirectMessage) {
+            apiService.getConversationHistory(conversationId, 100).enqueue(new Callback<List<Map<String, Object>>>() {
+                @Override
+                public void onResponse(@NonNull Call<List<Map<String, Object>>> call, @NonNull Response<List<Map<String, Object>>> response) {
+                    isMessageRequestInFlight = false;
 
-                if (loadingProgress != null) {
-                    loadingProgress.setVisibility(View.GONE);
+                    if (loadingProgress != null) {
+                        loadingProgress.setVisibility(View.GONE);
+                    }
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        displayMessages(response.body());
+                        android.util.Log.d("CHAT_DM", "Loaded " + response.body().size() + " messages");
+                    } else if (showLoader) {
+                        android.util.Log.e("CHAT_DM", "Failed to load messages: " + response.code());
+                        Toast.makeText(ChatDetailActivity.this, "Failed to load messages", Toast.LENGTH_SHORT).show();
+                    }
                 }
 
-                if (response.isSuccessful() && response.body() != null) {
-                    displayMessages(response.body());
-                } else if (showLoader) {
-                    Toast.makeText(ChatDetailActivity.this, "Failed to load messages", Toast.LENGTH_SHORT).show();
-                }
-            }
+                @Override
+                public void onFailure(@NonNull Call<List<Map<String, Object>>> call, @NonNull Throwable t) {
+                    isMessageRequestInFlight = false;
 
-            @Override
-            public void onFailure(@NonNull Call<List<Map<String, Object>>> call, @NonNull Throwable t) {
-                isMessageRequestInFlight = false;
+                    if (loadingProgress != null) {
+                        loadingProgress.setVisibility(View.GONE);
+                    }
 
-                if (loadingProgress != null) {
-                    loadingProgress.setVisibility(View.GONE);
+                    if (showLoader) {
+                        android.util.Log.e("CHAT_DM", "Error loading messages: " + t.getMessage(), t);
+                        Toast.makeText(ChatDetailActivity.this, "Error loading messages: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                }
+            });
+        } else {
+            // Sprint messages
+            apiService.getMessages(sprintId, 100).enqueue(new Callback<List<Map<String, Object>>>() {
+                @Override
+                public void onResponse(@NonNull Call<List<Map<String, Object>>> call, @NonNull Response<List<Map<String, Object>>> response) {
+                    isMessageRequestInFlight = false;
+
+                    if (loadingProgress != null) {
+                        loadingProgress.setVisibility(View.GONE);
+                    }
+
+                    if (response.isSuccessful() && response.body() != null) {
+                        displayMessages(response.body());
+                    } else if (showLoader) {
+                        Toast.makeText(ChatDetailActivity.this, "Failed to load messages", Toast.LENGTH_SHORT).show();
+                    }
                 }
 
-                if (showLoader) {
-                    Toast.makeText(ChatDetailActivity.this, "Error loading messages: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                @Override
+                public void onFailure(@NonNull Call<List<Map<String, Object>>> call, @NonNull Throwable t) {
+                    isMessageRequestInFlight = false;
+
+                    if (loadingProgress != null) {
+                        loadingProgress.setVisibility(View.GONE);
+                    }
+
+                    if (showLoader) {
+                        Toast.makeText(ChatDetailActivity.this, "Error loading messages: " + t.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
                 }
-            }
-        });
+            });
+        }
     }
     
     // ==================== Display Messages ====================
@@ -554,7 +603,16 @@ public class ChatDetailActivity extends AppCompatActivity {
             messageData.put("media_name", mediaName);
         }
         
-        Call<Map<String, Object>> call = apiService.sendMessage(sprintId, messageData);
+        // Use appropriate API method based on message type
+        Call<Map<String, Object>> call;
+        if (isDirectMessage) {
+            call = apiService.sendDirectMessage(conversationId, messageData);
+            android.util.Log.d("SEND_MSG_DM", "Sending direct message to conversation: " + conversationId);
+        } else {
+            call = apiService.sendMessage(sprintId, messageData);
+            android.util.Log.d("SEND_MSG_SPRINT", "Sending sprint message to sprint: " + sprintId);
+        }
+        
         call.enqueue(new Callback<Map<String, Object>>() {
             @Override
             public void onResponse(Call<Map<String, Object>> call, Response<Map<String, Object>> response) {
@@ -567,8 +625,10 @@ public class ChatDetailActivity extends AppCompatActivity {
                         messageInput.setText("");
                     }
                     loadMessagesFromApi(false);
+                    android.util.Log.d("SEND_MSG", "Message sent successfully");
                 } else {
-                    Toast.makeText(ChatDetailActivity.this, "Failed to send message", Toast.LENGTH_SHORT).show();
+                    android.util.Log.e("SEND_MSG", "Failed to send message: " + response.code());
+                    Toast.makeText(ChatDetailActivity.this, "Failed to send message (Code: " + response.code() + ")", Toast.LENGTH_SHORT).show();
                 }
             }
             
@@ -577,6 +637,7 @@ public class ChatDetailActivity extends AppCompatActivity {
                 if (loadingProgress != null) {
                     loadingProgress.setVisibility(View.GONE);
                 }
+                android.util.Log.e("SEND_MSG", "Error sending message: " + t.getMessage(), t);
                 Toast.makeText(ChatDetailActivity.this, "Error sending message: " + t.getMessage(), Toast.LENGTH_SHORT).show();
             }
         });

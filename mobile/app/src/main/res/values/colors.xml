@@ -1,12 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg_dark">#0F172A</color>
-    <color name="input_bg">#1E293B</color>
+    <!-- ==================== LIGHT THEME (Default) ==================== -->
+
+    <!-- Primary Colors -->
+    <color name="md_theme_light_primary">#2563EB</color>
+    <color name="md_theme_light_on_primary">#FFFFFF</color>
+    <color name="md_theme_light_primary_container">#DBEAFE</color>
+    <color name="md_theme_light_on_primary_container">#001E6E</color>
+
+    <!-- Secondary Colors -->
+    <color name="md_theme_light_secondary">#7C3AED</color>
+    <color name="md_theme_light_on_secondary">#FFFFFF</color>
+    <color name="md_theme_light_secondary_container">#F3E8FF</color>
+    <color name="md_theme_light_on_secondary_container">#21005D</color>
+
+    <!-- Tertiary Colors -->
+    <color name="md_theme_light_tertiary">#0891B2</color>
+    <color name="md_theme_light_on_tertiary">#FFFFFF</color>
+    <color name="md_theme_light_tertiary_container">#CFFAFE</color>
+    <color name="md_theme_light_on_tertiary_container">#001A1D</color>
+
+    <!-- Background & Surface -->
+    <color name="md_theme_light_background">#FFFFFF</color>
+    <color name="md_theme_light_on_background">#0F1419</color>
+    <color name="md_theme_light_surface">#F8FAFC</color>
+    <color name="md_theme_light_on_surface">#475569</color>
+    <color name="md_theme_light_surface_variant">#E2E8F0</color>
+    <color name="md_theme_light_on_surface_variant">#64748B</color>
+
+    <!-- Error & Status Colors -->
+    <color name="md_theme_light_error">#DC2626</color>
+    <color name="md_theme_light_on_error">#FFFFFF</color>
+    <color name="md_theme_light_error_container">#FFEBEE</color>
+    <color name="md_theme_light_on_error_container">#8B0000</color>
+    <color name="md_theme_light_success">#059669</color>
+    <color name="md_theme_light_success_container">#ECFDF5</color>
+    <color name="md_theme_light_warning">#D97706</color>
+    <color name="md_theme_light_warning_container">#FFFBEB</color>
+    <color name="md_theme_light_info">#0891B2</color>
+    <color name="md_theme_light_info_container">#CFFAFE</color>
+
+    <!-- Outline & Dividers -->
+    <color name="md_theme_light_outline">#94A3B8</color>
+    <color name="md_theme_light_outline_variant">#CBD5E1</color>
+    <color name="md_theme_light_divider">#E2E8F0</color>
+
+    <!-- Input Fields & Buttons -->
+    <color name="md_theme_light_input_bg">#F8FAFC</color>
+    <color name="md_theme_light_input_border">#E2E8F0</color>
+    <color name="md_theme_light_input_border_focused">#2563EB</color>
+    <color name="md_theme_light_input_text">#0F1419</color>
+    <color name="md_theme_light_input_placeholder">#94A3B8</color>
+
+    <!-- Chips & Tags -->
+    <color name="md_theme_light_chip_bg">#EFF6FF</color>
+    <color name="md_theme_light_chip_text">#0C4A6E</color>
+
+    <!-- Gradients (Left to Right / Top to Bottom) -->
+    <color name="md_theme_light_gradient_start">#2563EB</color>
+    <color name="md_theme_light_gradient_end">#7C3AED</color>
+
+    <!-- Splash Screen -->
+    <color name="splash_bg">#F8FAFC</color>
+
+    <!-- Legacy/Backward Compatibility -->
     <color name="brand_blue">#2563EB</color>
     <color name="text_white">#FFFFFF</color>
-    <color name="text_muted">#94A3B8</color>
+    <color name="text_primary">#0F1419</color>
+    <color name="text_secondary">#64748B</color>
 
-    <color name="splash_bg">#0F1219</color>
-    <color name="text_secondary">#4A5568</color>
-    <color name="brand_blue_bright">#1E73E8</color>
 </resources>

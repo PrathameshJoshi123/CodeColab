@@ -45,27 +45,30 @@ class ProfileUpdate(BaseModel):
     """Profile update data"""
     full_name: Optional[str] = None
     bio: Optional[str] = None
-    avatar_url: Optional[str] = None
-    expertise_areas: Optional[list[str]] = None
-    location: Optional[str] = None
+    college: Optional[str] = None
+    city: Optional[str] = None
+    github_username: Optional[str] = None
     linkedin_url: Optional[str] = None
-    github_url: Optional[str] = None
-    website_url: Optional[str] = None
+    profile_image_url: Optional[str] = None
+    is_available: Optional[bool] = None
 
 
 class Profile(BaseModel):
     """User profile model"""
-    user_id: str
-    full_name: Optional[str] = None
-    bio: Optional[str] = None
-    avatar_url: Optional[str] = None
-    expertise_areas: Optional[list[str]] = None
-    location: Optional[str] = None
-    linkedin_url: Optional[str] = None
-    github_url: Optional[str] = None
-    website_url: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    userId: str
+    full_name: str = ""
+    bio: str = ""
+    college: str = ""
+    city: str = ""
+    github_username: str = ""
+    linkedin_url: str = ""
+    profile_image_url: str = ""
+    karma_score: int = 0
+    xp_points: int = 0
+    level: int = 1
+    streak_count: int = 0
+    is_available: bool = True
 
     class Config:
         from_attributes = True
+        populate_by_name = True

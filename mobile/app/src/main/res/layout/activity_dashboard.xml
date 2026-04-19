@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark">
+    android:background="?attr/colorBackground">
 
     <LinearLayout
         android:id="@+id/headerContainer"
@@ -22,7 +22,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Find Partners"
-                android:textColor="@color/text_white"
+                android:textColor="?attr/colorOnBackground"
                 android:textSize="24sp"
                 android:textStyle="bold" />
 
@@ -49,7 +49,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="1,240 developers online"
-            android:textColor="@color/text_muted"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:textSize="14sp" />
     </LinearLayout>
 

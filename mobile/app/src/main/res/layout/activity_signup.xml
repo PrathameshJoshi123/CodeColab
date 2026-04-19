@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark">
+    android:background="?attr/colorBackground">
 
     <ScrollView
         android:layout_width="match_parent"
@@ -29,14 +29,14 @@
                     android:layout_height="32dp"
                     android:src="@android:drawable/ic_menu_revert"
                     android:contentDescription="Back"
-                    app:tint="@color/text_white" />
+                    app:tint="?attr/colorOnBackground" />
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_centerInParent="true"
                     android:text="Create Account"
-                    android:textColor="@color/text_white"
+                    android:textColor="?attr/colorOnBackground"
                     android:textSize="18sp"
                     android:textStyle="bold" />
             </RelativeLayout>
@@ -46,7 +46,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="40dp"
                 android:text="Join the community"
-                android:textColor="@color/text_white"
+                android:textColor="?attr/colorOnBackground"
                 android:textSize="28sp"
                 android:textStyle="bold" />
 
@@ -55,14 +55,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="Build something great with our developer tools."
-                android:textColor="@color/text_muted"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:textSize="14sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Full Name"
-                android:textColor="@color/text_white"
+                android:textColor="?attr/colorOnSurface"
                 android:layout_marginTop="32dp" />
 
             <EditText
@@ -73,11 +73,11 @@
                 android:background="@drawable/input_background"
                 android:drawableStart="@drawable/ic_person"
                 android:drawablePadding="12dp"
-                android:drawableTint="@color/text_muted"
+                android:drawableTint="?attr/colorOnSurfaceVariant"
                 android:hint="Enter your name"
                 android:paddingStart="16dp"
                 android:paddingEnd="16dp"
-                android:textColor="@color/text_white"
+                android:textColor="?attr/colorOnSurface"
                 android:textColorHint="@color/text_muted"
                 android:inputType="textPersonName"/>
 

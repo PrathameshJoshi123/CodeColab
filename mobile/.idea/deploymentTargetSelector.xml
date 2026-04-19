@@ -8,12 +8,17 @@
           <targets>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="LocalEmulator" identifier="path=C:\Users\Prathamesh Joshi\.android\avd\Pixel_9.avd" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=RZ8R723016K" />
               </handle>
             </Target>
             <Target type="DEFAULT_BOOT">
               <handle>
-                <DeviceId pluginId="PhysicalDevice" identifier="serial=RZ8R723016K" />
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=10BE2T0FRZ000A2" />
+              </handle>
+            </Target>
+            <Target type="DEFAULT_BOOT">
+              <handle>
+                <DeviceId pluginId="PhysicalDevice" identifier="serial=44181FDJH003W6" />
               </handle>
             </Target>
           </targets>
